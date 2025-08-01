@@ -125,7 +125,7 @@ async def on_message(message: discord.Message):
 
     await bot.process_commands(message)  # Important for slash commands to work
 
-    if message.channel.id == 1276958742373601374:
+    if message.channel.id == 1400737018417516684:
         new_nick = message.content.strip()
 
         # Optional: Validate nickname
