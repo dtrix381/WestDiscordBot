@@ -50,7 +50,7 @@ final_balance = None
 starting_balance = 0
 
 # Initialize SQLite database
-conn = sqlite3.connect("west.db")
+conn = sqlite3.connect('/data/west.db')
 cursor = conn.cursor()
 
 # Create tables if they don't exist
@@ -250,7 +250,7 @@ async def wager_leaderboard(interaction: discord.Interaction, page: Optional[int
     offset = (page - 1) * items_per_page  # Calculate the offset for pagination
 
     # Database connection and query
-    conn = sqlite3.connect('west.db')
+    conn = sqlite3.connect('/data/west.db')
     cursor = conn.cursor()
 
     # Fetch leaderboard data (use discord_id instead of viewer_name)
@@ -366,7 +366,7 @@ async def generate_wager_leaderboard_embeds(interaction: discord.Interaction, pa
     offset = (page - 1) * items_per_page
 
     # Database connection and query
-    conn = sqlite3.connect('west.db')
+    conn = sqlite3.connect('/data/west.db')
     c = conn.cursor()
 
     cursor.execute('''
