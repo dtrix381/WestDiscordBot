@@ -1,4 +1,4 @@
 .env
-*.db
+west.db
 __pycache__/
 *.pyc
