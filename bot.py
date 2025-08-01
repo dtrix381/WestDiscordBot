@@ -135,7 +135,7 @@ async def on_message(message: discord.Message):
                 await message.author.edit(nick=new_nick)
 
                 # Add the verification role
-                role = message.guild.get_role(1389128704055050343)
+                role = message.guild.get_role(1341577464601645066)
                 if role:
                     await message.author.add_roles(role)
                 await message.channel.send(
@@ -614,7 +614,7 @@ async def gtb_reset(interaction: discord.Interaction):
     conn.commit()
     await interaction.response.send_message("✅ GTB data reset.")
 
-RAINBET_CHANNEL_ID = 1400705736090062870  # 🔁 Replace with your actual channel ID
+RAINBET_CHANNEL_ID = 1400738936271405097  # 🔁 Replace with your actual channel ID
 
 @bot.tree.command(name="connect_rainbet", description="Link your Rainbet username (only works in designated channel).")
 @app_commands.describe(username="Enter your Rainbet username")
