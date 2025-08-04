@@ -710,7 +710,7 @@ from PIL import ImageFont
 
 def build_bingo_image(card, marked_slots=[]):
     letters = ["B", "O", "N", "U", "S"]
-    font = ImageFont.truetype("arial.ttf", 36)
+    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
 
     header_height = 50
     img_width = ICON_SIZE * GRID_SIZE + PADDING * (GRID_SIZE + 1)
