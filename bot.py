@@ -12,6 +12,10 @@ import wavelink
 from dotenv import load_dotenv
 import os
 from typing import List
+import sqlite3, json, os
+from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
+from discord.ui import View, Button
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -50,7 +54,7 @@ final_balance = None
 starting_balance = 0
 
 # Initialize SQLite database
-conn = sqlite3.connect('/data/west.db')
+conn = sqlite3.connect("west.db")
 cursor = conn.cursor()
 
 # Create tables if they don't exist
@@ -250,7 +254,7 @@ async def wager_leaderboard(interaction: discord.Interaction, page: Optional[int
     offset = (page - 1) * items_per_page  # Calculate the offset for pagination
 
     # Database connection and query
-    conn = sqlite3.connect('/data/west.db')
+    conn = sqlite3.connect('west.db')
     cursor = conn.cursor()
 
     # Fetch leaderboard data (use discord_id instead of viewer_name)
@@ -366,7 +370,7 @@ async def generate_wager_leaderboard_embeds(interaction: discord.Interaction, pa
     offset = (page - 1) * items_per_page
 
     # Database connection and query
-    conn = sqlite3.connect('/data/west.db')
+    conn = sqlite3.connect('west.db')
     c = conn.cursor()
 
     cursor.execute('''
@@ -637,6 +641,485 @@ async def connect_rainbet(interaction: discord.Interaction, username: str):
     await interaction.response.send_message(
         f"✅ Your Rainbet username **{username}** has been recorded.")
 
+
+# === CONFIG ===
+ICON_SIZE = 100
+GRID_SIZE = 5
+PADDING = 10
+WILD_IMAGE = "bingo_icons/wild.webp"
+DB_PATH = "west.db"
+
+SLOT_NAMES = ["2 Wild 2 Die", "5 Lions Megaways", "Beast Below", "Benny the Beer", "Big Bass Bonanza", "Book of Time", "Bouncy Bombs", "Chicken Man",
+    "Cloud Princess", "Cursed Seas", "Dark Summoning", "Densho", "Donny Dough", "Donut Division", "Dork Unit", "Dragon's Domain", "Evil Eyes",
+    "Extra Juicy", "Fear the Dark", "Fire Portals", "Fish Eye", "Fist of Destruction", "FRKN Bananas", "Fruit Party", "Fruit Party 2", "Fruity Treats",
+    "Gates of Olympus", "Gates of Olympus 1000", "Gates of Olympus Super Scatter", "Gemhalla", "Gems Bonanza", "Hand of Anubis", "Heart of Cleopatra",
+    "Hoot Shot the Sheriff", "Hot Fiesta", "Hounds of Hell", "Jewel Rush", "Le Bandit", "Le King", "Le Pharaoh", "Le Viking", "Life and Death",
+    "Madame Destiny Megaways", "Mayan Stackways", "Outsourced", "Phoenix DuelReels", "Pickle Bandit", "Pirate Bonanza", "Power of Thor Megaways",
+    "Pyrofox", "Rad Maxx", "Rise of Ymir", "Rotten", "SixSixSix", "Sky Bounty", "Slayers Inc", "Starlight Princess", "Starlight Princess 1000",
+    "Stormforged", "Sugar Rush", "Sugar Rush 1000", "Sugar Supreme Powernudge", "Sweet Bonanza 1000", "Ultimate Slot of America", "Vending Machine",
+    "Wanted Dead or a Wild", "Wheel o'Gold", "Wild Bison Charge", "Wild West Gold", "Wild West Gold Blazing Bounty", "Wild West Gold Megaways",
+    "Wings of Horus", "Wisdom of Athena 1000", "Zeus vs Hades Gods of War", "Ze Zeus"]
+
+# === FUNCTIONS ===
+
+def sanitize_filename(name):
+    return (
+        name.lower()
+        .replace(" ", "_")
+        .replace(":", "")
+        .replace("’", "")
+        .replace("'", "")
+        .replace('"', "")
+    ) + ".webp"
+
+def generate_bingo_card(conn):
+    from random import sample
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT slot_name FROM slots WHERE is_marked = 0")
+    available_slots = [row[0] for row in cursor.fetchall()]
+
+    if len(available_slots) < 24:
+        raise ValueError("Not enough unmarked slots left to generate a card.")
+
+    chosen_slots = sample(available_slots, 24)
+    chosen_slots.insert(12, "WILD")  # Middle of the 5x5 grid
+
+    # Reshape into 5x5 grid
+    card = [chosen_slots[i*5:(i+1)*5] for i in range(5)]
+    return card
+
+
+
+def load_slot_icon(slot_name):
+    possible_filenames = [
+        slot_name.lower().replace(" ", "_").replace(":", "") + ".webp",
+        slot_name.lower().replace(" ", "").replace(":", "") + ".webp",
+        slot_name + ".webp",
+    ]
+
+    for fname in possible_filenames:
+        path = os.path.join("bingo_icons", fname)
+        if os.path.exists(path):
+            return Image.open(path).resize((ICON_SIZE, ICON_SIZE))
+
+    # fallback gray box if nothing found
+    return Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (50, 50, 50, 255))
+
+from PIL import ImageFont
+
+def build_bingo_image(card, marked_slots=[]):
+    letters = ["B", "O", "N", "U", "S"]
+    font = ImageFont.truetype("arial.ttf", 36)
+
+    header_height = 50
+    img_width = ICON_SIZE * GRID_SIZE + PADDING * (GRID_SIZE + 1)
+    img_height = header_height + ICON_SIZE * GRID_SIZE + PADDING * (GRID_SIZE + 1)
+
+    card_img = Image.new("RGBA", (img_width, img_height), (20, 20, 20, 255))
+    draw = ImageDraw.Draw(card_img)
+
+    # Draw B O N U S header
+    for col in range(GRID_SIZE):
+        bbox = draw.textbbox((0, 0), letters[col], font=font)
+        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        x = PADDING + col * (ICON_SIZE + PADDING) + (ICON_SIZE - w) // 2
+        y = (header_height - h) // 2
+        draw.text((x, y), letters[col], font=font, fill=(255, 215, 0))
+
+    # Draw slots
+    for row in range(GRID_SIZE):
+        for col in range(GRID_SIZE):
+            slot = card[row][col]
+            x = PADDING + col * (ICON_SIZE + PADDING)
+            y = header_height + PADDING + row * (ICON_SIZE + PADDING)
+
+            # Load icon
+            if row == 2 and col == 2:
+                icon = Image.open(WILD_IMAGE).resize((ICON_SIZE, ICON_SIZE))
+                is_marked = True
+            else:
+                icon = load_slot_icon(slot)
+                is_marked = slot in marked_slots
+
+            # Paste icon
+            card_img.paste(icon, (x, y))
+
+            # Draw border if marked
+            if is_marked:
+                border_color = (255, 215, 0, 255)  # gold
+                border_thickness = 4
+                for i in range(border_thickness):
+                    draw.rectangle(
+                        [x - i, y - i, x + ICON_SIZE + i - 1, y + ICON_SIZE + i - 1],
+                        outline=border_color
+                    )
+
+    return card_img
+
+# === BINGO COG ===
+class BingoBonus(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.conn = sqlite3.connect(DB_PATH)
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS bingo_cards (
+                user_id TEXT PRIMARY KEY,
+                card TEXT
+            )
+        """)
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS slots (
+                slot_name TEXT PRIMARY KEY,
+                is_marked INTEGER DEFAULT 0
+            )
+        """)
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS slot_owners (
+                slot_name TEXT,
+                user_id TEXT,
+                UNIQUE(slot_name, user_id)
+            )
+        """)
+        self.conn.commit()
+
+        # ✅ Init slot list if not done yet
+        initialize_slots_table(self.conn)
+
+    @app_commands.command(name="bingo_bonus_join", description="Join the Bingo Bonus event and get your card")
+    async def bingo_bonus_join(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        user_id = str(interaction.user.id)
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT 1 FROM bingo_cards WHERE user_id = ?", (user_id,))
+        if cursor.fetchone():
+            await interaction.followup.send("🎟️ You already have a Bingo Bonus card! Use `/bingo_bonus_card`.", ephemeral=True)
+            return
+
+        card = generate_bingo_card(self.conn)
+        cursor.execute("INSERT INTO bingo_cards (user_id, card) VALUES (?, ?)", (user_id, json.dumps(card)))
+        self.conn.commit()
+        await interaction.followup.send("✅ Card created! Use `/bingo_bonus_card` to view it.", ephemeral=True)
+
+    @app_commands.command(name="bingo_bonus_card", description="Show your Bingo Bonus card")
+    async def bingo_bonus_card(self, interaction: discord.Interaction):
+        user_id = str(interaction.user.id)
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT card FROM bingo_cards WHERE user_id = ?", (user_id,))
+        result = cursor.fetchone()
+        if not result:
+            await interaction.response.send_message("❌ You don't have a card yet. Use `/bingo_bonus_join`.", ephemeral=True)
+            return
+
+        card = json.loads(result[0])
+
+        # Fetch globally marked slots
+        cursor.execute("SELECT slot_name FROM slots WHERE is_marked = 1")
+        marked_slots = [row[0] for row in cursor.fetchall()]
+
+        # Build image with marked slots highlighted
+        image = build_bingo_image(card, marked_slots)
+        image.save("temp_card.png")
+
+        file = discord.File("temp_card.png", filename="bingo_card.png")
+        embed = discord.Embed(title="🎰 Your BINGO BONUS Card", color=discord.Color.gold())
+        embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)
+        embed.set_image(url="attachment://bingo_card.png")
+        await interaction.response.send_message(file=file, embed=embed, ephemeral=False)
+
+    @app_commands.command(name="mark_slot", description="Mark a slot as played")
+    @app_commands.describe(slot_name="Select slot to mark as played")
+    async def mark_slot(self, interaction: discord.Interaction, slot_name: str):
+        # Optional admin check
+        if interaction.user.id != 488015447417946151:
+            await interaction.response.send_message("⛔ Only the admin can mark slots.", ephemeral=True)
+            return
+
+        cursor = self.conn.cursor()
+
+        # Check if slot exists
+        cursor.execute("SELECT 1 FROM slots WHERE slot_name = ?", (slot_name,))
+        if not cursor.fetchone():
+            await interaction.response.send_message(f"❌ Slot '{slot_name}' not found.", ephemeral=True)
+            return
+
+        # Mark it
+        cursor.execute("UPDATE slots SET is_marked = 1 WHERE slot_name = ?", (slot_name,))
+
+        # Find users who have that slot
+        cursor.execute("SELECT user_id, card FROM bingo_cards")
+        affected_users = []
+        for user_id, card_json in cursor.fetchall():
+            card = json.loads(card_json)
+            flat_card = [slot for row in card for slot in row]
+            if slot_name in flat_card:
+                affected_users.append(user_id)
+
+        self.conn.commit()
+
+        # Format mention list
+        mentions = " ".join(f"<@{uid}>" for uid in affected_users) if affected_users else "*No one had this slot.*"
+
+        await interaction.response.send_message(
+            f"🎉 **{slot_name}** has been marked — it BONUSED!\n\n{mentions}",
+            ephemeral=False
+        )
+
+        # Get leaderboard
+        leaders = get_top_players_close_to_win(self.conn)
+
+        if leaders:
+            leaderboard_msg = "**📊 Players closest to winning:**\n"
+            for rank, (user_id, missing) in enumerate(leaders, start=1):
+                leaderboard_msg += f"**{rank}.** <@{user_id}> – needs **{missing}** more\n"
+            await interaction.channel.send(leaderboard_msg)
+
+            winners = self.check_for_winners()
+            if winners:
+                mentions = ", ".join(f"<@{uid}>" for uid in winners)
+                await interaction.channel.send(
+                    f"🏆 **BINGO BONUS WINNERS!** 🏆\n\n🎉 Congrats {mentions} — you just completed a winning pattern!\nEvent ends here!"
+                )
+
+    # Autocomplete for slot names
+    @mark_slot.autocomplete("slot_name")
+    async def mark_slot_autocomplete(self, interaction: discord.Interaction, current: str):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT slot_name FROM slots WHERE is_marked = 0 AND slot_name LIKE ?", (f"%{current}%",))
+        slots = cursor.fetchall()
+        return [
+            app_commands.Choice(name=slot[0], value=slot[0])
+            for slot in slots[:25]
+        ]
+
+    def check_for_winners(self):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT user_id, card FROM bingo_cards")
+        players = cursor.fetchall()
+
+        winners = []
+
+        for user_id, card_json in players:
+            card = json.loads(card_json)
+
+            # Collect marked slots including center WILD
+            marked = []
+            for row in range(5):
+                for col in range(5):
+                    if row == 2 and col == 2:
+                        marked.append("WILD")
+                    else:
+                        slot = card[row][col]
+                        cursor.execute("SELECT is_marked FROM slots WHERE slot_name = ?", (slot,))
+                        result = cursor.fetchone()
+                        if result and result[0] == 1:
+                            marked.append(slot)
+
+            # Check if any pattern is completed
+            for pattern in WINNING_PATTERNS:
+                if all(card[r][c] == "WILD" or card[r][c] in marked for r, c in pattern):
+                    winners.append(user_id)
+                    break  # No need to check other patterns for this user
+
+        return winners
+
+    @app_commands.command(name="bingo_bonus_hunt", description="List all unmarked slots to be played (random order)")
+    async def bingo_bonus_hunt(self, interaction: discord.Interaction):
+        if interaction.user.id != 488015447417946151:
+            await interaction.response.send_message("⛔ Only the admin can use this command.", ephemeral=True)
+            return
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT slot_name FROM slots WHERE is_marked = 0")
+        unmarked_slots = [row[0] for row in cursor.fetchall()]
+
+        if not unmarked_slots:
+            await interaction.response.send_message("✅ All slots have been marked already.", ephemeral=True)
+            return
+
+        random.shuffle(unmarked_slots)
+        slots_per_page = 15
+        total_pages = math.ceil(len(unmarked_slots) / slots_per_page)
+
+        def get_page_embed(page):
+            start = page * slots_per_page
+            end = start + slots_per_page
+            chunk = unmarked_slots[start:end]
+            description = "\n".join(f"{start + j + 1}. {slot}" for j, slot in enumerate(chunk))
+            embed = discord.Embed(
+                title=f"🎯 Bingo Bonus Hunt — Page {page + 1}/{total_pages}",
+                description=description,
+                color=discord.Color.orange()
+            )
+            return embed
+
+        class HuntPaginator(View):
+            def __init__(self):
+                super().__init__(timeout=120)
+                self.page = 0
+
+            @discord.ui.button(label="⏮ Prev", style=discord.ButtonStyle.gray)
+            async def prev_button(self, interaction_button: discord.Interaction, button: Button):
+                if interaction.user != interaction_button.user:
+                    return await interaction_button.response.send_message(
+                        "❌ Only the command user can control pagination.", ephemeral=True)
+
+                if self.page > 0:
+                    self.page -= 1
+                    await interaction_button.response.edit_message(embed=get_page_embed(self.page), view=self)
+
+            @discord.ui.button(label="⏭ Next", style=discord.ButtonStyle.gray)
+            async def next_button(self, interaction_button: discord.Interaction, button: Button):
+                if interaction.user != interaction_button.user:
+                    return await interaction_button.response.send_message(
+                        "❌ Only the command user can control pagination.", ephemeral=True)
+
+                if self.page < total_pages - 1:
+                    self.page += 1
+                    await interaction_button.response.edit_message(embed=get_page_embed(self.page), view=self)
+
+        await interaction.response.send_message(embed=get_page_embed(0), view=HuntPaginator(), ephemeral=False)
+
+    @app_commands.command(name="bingo_bonus_reset", description="⚠️ Reset all marked slots and bingo cards")
+    async def bingo_bonus_reset(self, interaction: discord.Interaction):
+        if interaction.user.id != 488015447417946151:
+            await interaction.response.send_message("⛔ Only the admin can reset the bingo event.", ephemeral=True)
+            return
+
+        conn = self.conn  # capture this outside to pass into the view
+
+        class ConfirmResetView(View):
+            def __init__(self, conn):
+                super().__init__(timeout=30)
+                self.conn = conn
+
+            @discord.ui.button(label="✅ Confirm Reset", style=discord.ButtonStyle.danger)
+            async def confirm(self, interaction_button: discord.Interaction, button: Button):
+                if interaction.user != interaction_button.user:
+                    await interaction_button.response.send_message("❌ Only the admin can confirm this reset.",
+                                                                   ephemeral=True)
+                    return
+
+                cursor = self.conn.cursor()
+                cursor.execute("UPDATE slots SET is_marked = 0")
+                cursor.execute("DELETE FROM bingo_cards")
+                self.conn.commit()
+
+                await interaction_button.response.edit_message(
+                    content="✅ All bingo cards and marked slots have been reset.", view=None)
+
+            @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.secondary)
+            async def cancel(self, interaction_button: discord.Interaction, button: Button):
+                if interaction.user != interaction_button.user:
+                    await interaction_button.response.send_message("❌ Only the admin can cancel this.", ephemeral=True)
+                    return
+
+                await interaction_button.response.edit_message(content="❌ Reset cancelled.", view=None)
+
+        view = ConfirmResetView(conn)
+        await interaction.response.send_message(
+            "**⚠️ Are you sure you want to reset all Bingo Bonus progress?**\nThis will clear all player cards and unmark all 75 slots.",
+            view=view,
+            ephemeral=True
+        )
+
+# === BOT SETUP ===
+class BingoBot(commands.Bot):
+    async def setup_hook(self):
+        await self.add_cog(BingoBonus(self))
+        self.tree.add_command(bingo_bonus_rules)
+        await self.tree.sync()
+        print("✅ Slash commands synced.")
+
+intents = discord.Intents.default()
+bot = BingoBot(command_prefix="/", intents=intents)
+
+def initialize_slots_table(conn):
+    cursor = conn.cursor()
+    for slot in SLOT_NAMES:
+        cursor.execute("INSERT OR IGNORE INTO slots (slot_name) VALUES (?)", (slot,))
+    conn.commit()
+
+@app_commands.command(name="bingo_bonus_rules", description="Show the Bingo Bonus rules and winning patterns")
+async def bingo_bonus_rules(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🎯 BINGO BONUS RULES",
+        description=(
+            "**Whenever West is on a Bonus Hunt Event, the WEST BINGO BONUS is active!**\n\n"
+            "🟡 **Only 75 slots** from the Bingo Cards will be played.\n"
+            "🟡 For fairness, West will use the `/bingo_hunt` command to determine the slots order to play.\n"
+            "🟡 West can end the hunt at any time.\n"
+            "🟡 If he hunts again on a different day, he must run `/bingo_hunt` again to get new slots order to play.\n"
+            "🟡 The event continues **until someone completes one of the winning patterns**.\n\n"
+            "📌 Below are the **12 Winning Patterns** you need to complete to win!"
+        ),
+        color=discord.Color.gold()
+    )
+    embed.set_image(url="attachment://winning_patterns.png")
+
+    file = discord.File("winning_patterns.png", filename="winning_patterns.png")
+    await interaction.response.send_message(embed=embed, file=file, ephemeral=False)
+
+
+WINNING_PATTERNS = [
+    # Vertical B O N U S
+    [(0,0), (1,0), (2,0), (3,0), (4,0)],
+    [(0,1), (1,1), (2,1), (3,1), (4,1)],
+    [(0,2), (1,2), (2,2), (3,2), (4,2)],
+    [(0,3), (1,3), (2,3), (3,3), (4,3)],
+    [(0,4), (1,4), (2,4), (3,4), (4,4)],
+    # Horizontal lines
+    [(0,0), (0,1), (0,2), (0,3), (0,4)],
+    [(1,0), (1,1), (1,2), (1,3), (1,4)],
+    [(2,0), (2,1), (2,2), (2,3), (2,4)],
+    [(3,0), (3,1), (3,2), (3,3), (3,4)],
+    [(4,0), (4,1), (4,2), (4,3), (4,4)],
+    # Diagonals
+    [(0,0), (1,1), (2,2), (3,3), (4,4)],
+    [(0,4), (1,3), (2,2), (3,1), (4,0)]
+]
+
+def get_top_players_close_to_win(conn, top_n=3, max_missing=4):
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, card FROM bingo_cards")
+    all_players = cursor.fetchall()
+
+    player_progress = []
+
+    for user_id, card_json in all_players:
+        card = json.loads(card_json)
+
+        # Flatten marked slots (includes WILD center slot)
+        marked = []
+        for row in range(5):
+            for col in range(5):
+                if row == 2 and col == 2:
+                    marked.append("WILD")
+                elif card[row][col]:
+                    slot_name = card[row][col]
+                    cursor.execute("SELECT is_marked FROM slots WHERE slot_name = ?", (slot_name,))
+                    result = cursor.fetchone()
+                    if result and result[0] == 1:
+                        marked.append(slot_name)
+
+        # Track how close the player is to winning
+        fewest_missing = 5
+        for pattern in WINNING_PATTERNS:
+            needed = 0
+            for r, c in pattern:
+                slot = card[r][c]
+                if slot != "WILD" and slot not in marked:
+                    needed += 1
+            fewest_missing = min(fewest_missing, needed)
+
+        if fewest_missing <= max_missing:
+            player_progress.append((user_id, fewest_missing))
+
+    # Sort: closest to winning first
+    player_progress.sort(key=lambda x: x[1])
+
+    return player_progress[:top_n]
 print("Loaded token:", TOKEN)
 bot.run(TOKEN)
 
