@@ -113,13 +113,14 @@ conn.commit()
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
-
-    # Sync Slash Commands
     try:
+        await bot.add_cog(BingoBonus(bot))  # ✅ Add the Bingo cog here
+        bot.tree.add_command(bingo_bonus_rules)
         synced = await bot.tree.sync()
         print(f'Synced {len(synced)} commands')
     except Exception as e:
         print(f'Error syncing commands: {e}')
+
 
 
 @bot.event
@@ -1023,17 +1024,6 @@ class BingoBonus(commands.Cog):
             view=view,
             ephemeral=True
         )
-
-# === BOT SETUP ===
-class BingoBot(commands.Bot):
-    async def setup_hook(self):
-        await self.add_cog(BingoBonus(self))
-        self.tree.add_command(bingo_bonus_rules)
-        await self.tree.sync()
-        print("✅ Slash commands synced.")
-
-intents = discord.Intents.default()
-bot = BingoBot(command_prefix="/", intents=intents)
 
 def initialize_slots_table(conn):
     cursor = conn.cursor()
