@@ -20,6 +20,9 @@ from discord.ui import View, Button
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
+# === DYNAMIC DATABASE PATH ===
+DB_PATH = "/mnt/data/west.db" if os.path.exists("/mnt/data") else "west.db"
+
 # Set up intents to read messages and manage messages
 intents = discord.Intents.default()
 intents.guilds = True  # ✅ Required for full event context
@@ -54,7 +57,7 @@ final_balance = None
 starting_balance = 0
 
 # Initialize SQLite database
-conn = sqlite3.connect("west.db")
+conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
 # Create tables if they don't exist
@@ -255,7 +258,7 @@ async def wager_leaderboard(interaction: discord.Interaction, page: Optional[int
     offset = (page - 1) * items_per_page  # Calculate the offset for pagination
 
     # Database connection and query
-    conn = sqlite3.connect('west.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Fetch leaderboard data (use discord_id instead of viewer_name)
@@ -371,7 +374,7 @@ async def generate_wager_leaderboard_embeds(interaction: discord.Interaction, pa
     offset = (page - 1) * items_per_page
 
     # Database connection and query
-    conn = sqlite3.connect('west.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     cursor.execute('''
@@ -648,7 +651,7 @@ ICON_SIZE = 100
 GRID_SIZE = 5
 PADDING = 10
 WILD_IMAGE = "bingo_icons/wild.webp"
-DB_PATH = "west.db"
+DB_PATH = "/mnt/data/west.db" if os.path.exists("/mnt/data") else "west.db"
 
 SLOT_NAMES = ["2 Wild 2 Die", "5 Lions Megaways", "Beast Below", "Benny the Beer", "Big Bass Bonanza", "Book of Time", "Bouncy Bombs", "Chicken Man",
     "Cloud Princess", "Cursed Seas", "Dark Summoning", "Densho", "Donny Dough", "Donut Division", "Dork Unit", "Dragon's Domain", "Evil Eyes",
