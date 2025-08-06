@@ -23,15 +23,6 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 # === DYNAMIC DATABASE PATH ===
 DB_PATH = "/mnt/data/west.db" if os.path.exists("/mnt/data") else "west.db"
 
-# Set up intents to read messages and manage messages
-intents = discord.Intents.default()
-intents.guilds = True  # ✅ Required for full event context
-intents.presences = True
-intents.message_content = True
-intents.messages = True
-intents.members = True
-bot = commands.Bot(command_prefix="!", intents=intents)
-
 # Replace with your actual Discord Application Client ID
 CLIENT_ID = "1400670306397589685"
 
@@ -122,19 +113,6 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS gtb_state (
 cursor.execute('INSERT OR IGNORE INTO gtb_state (id, active) VALUES (1, 0)')
 cursor.execute('INSERT OR IGNORE INTO gtb_balances (id, starting_balance, final_balance) VALUES (1, NULL, NULL)')
 conn.commit()
-
-
-@bot.event
-async def on_ready():
-    print(f'Logged in as {bot.user.name}')
-    try:
-        await bot.add_cog(BingoBonus(bot))  # ✅ Add the Bingo cog here
-        bot.tree.add_command(bingo_bonus_rules)
-        synced = await bot.tree.sync()
-        print(f'Synced {len(synced)} commands')
-    except Exception as e:
-        print(f'Error syncing commands: {e}')
-
 
 
 @bot.event
@@ -1117,8 +1095,10 @@ class BingoBot(commands.Bot):
     async def setup_hook(self):
         await self.add_cog(BingoBonus(self))
         self.tree.add_command(bingo_bonus_rules)
+        print("Loaded commands:", [cmd.name for cmd in self.tree.get_commands()])
         await self.tree.sync()
         print("✅ Slash commands synced.")
+
 
 intents = discord.Intents.default()
 bot = BingoBot(command_prefix="/", intents=intents)
