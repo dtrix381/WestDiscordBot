@@ -20,6 +20,10 @@ from discord.ui import View, Button
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
+intents = discord.Intents.default()
+bot = BingoBot(command_prefix="/", intents=intents)
+
+
 # === DYNAMIC DATABASE PATH ===
 DB_PATH = "/mnt/data/west.db" if os.path.exists("/mnt/data") else "west.db"
 
@@ -1099,9 +1103,6 @@ class BingoBot(commands.Bot):
         await self.tree.sync()
         print("✅ Slash commands synced.")
 
-
-intents = discord.Intents.default()
-bot = BingoBot(command_prefix="/", intents=intents)
 
 def initialize_slots_table(conn):
     cursor = conn.cursor()
