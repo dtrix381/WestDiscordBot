@@ -20,9 +20,6 @@ from discord.ui import View, Button
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-# === DYNAMIC DATABASE PATH ===
-DB_PATH = "/mnt/data/west.db" if os.path.exists("/mnt/data") else "west.db"
-
 # Set up intents to read messages and manage messages
 intents = discord.Intents.default()
 intents.guilds = True  # ✅ Required for full event context
@@ -50,14 +47,25 @@ VERIFIED_ROLE_ID = 1389128704055050343
 # Your Discord user ID (admin)
 YOUR_DISCORD_ID = 1389128704055050343
 
+ADMIN_IDS = [
+    488015447417946151,  # your main ID
+    878253813553844254,  # example other admin
+    1259041735514918952   # add as many as you like
+]
+
+ALLOWED_COMMANDS = ["/bingo_bonus_join", "/bingo_bonus_card"]
+RESTRICTED_CHANNEL_ID = 1401920349402042449  # Replace with your channel ID
+
 # Global variables
 guesses = []
 starting_balance_set = False
 final_balance = None
 starting_balance = 0
 
+LAST_HUNT_MESSAGE = {}
+
 # Initialize SQLite database
-conn = sqlite3.connect(DB_PATH)
+conn = sqlite3.connect("west.db")
 cursor = conn.cursor()
 
 # Create tables if they don't exist
@@ -116,14 +124,13 @@ conn.commit()
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
+
+    # Sync Slash Commands
     try:
-        await bot.add_cog(BingoBonus(bot))  # ✅ Add the Bingo cog here
-        bot.tree.add_command(bingo_bonus_rules)
         synced = await bot.tree.sync()
         print(f'Synced {len(synced)} commands')
     except Exception as e:
         print(f'Error syncing commands: {e}')
-
 
 
 @bot.event
@@ -131,81 +138,83 @@ async def on_message(message: discord.Message):
     if message.author.bot:
         return
 
-    await bot.process_commands(message)  # Important for slash commands to work
+    # 🚫 Restrict /bingo commands in a specific channel
+    if message.channel.id == RESTRICTED_CHANNEL_ID:
+        if not any(message.content.strip().startswith(cmd) for cmd in ALLOWED_COMMANDS):
+            await message.delete()
+            await message.channel.send(
+                f"❌ {message.author.mention}, only `/bingo_bonus_join` and `/bingo_bonus_card` commands are allowed in this channel.",
+                delete_after=6
+            )
+            return
 
+    # ✅ Kick username verification
     if message.channel.id == 1400737018417516684:
         new_nick = message.content.strip()
 
-        # Optional: Validate nickname
         if 1 <= len(new_nick) <= 32:
             try:
-                # Change the nickname
                 await message.author.edit(nick=new_nick)
-
-                # Add the verification role
                 role = message.guild.get_role(1341577464601645066)
                 if role:
                     await message.author.add_roles(role)
+
                 await message.channel.send(
-                    f"🚫 {message.author.mention}, only verified users can enter **Westside**. "
-                    f"We need to confirm that your Kick username is **{new_nick}**. If it’s not, you’ll have to verify again."
+                    f"🚫 {message.author.mention}, only verified users can enter **Westside**.\n\n"
+                    f"We need to confirm that your Kick username is **{new_nick}**. If it’s not, you’ll have to verify again.\n\n"
+                    f"📍 Please go to <#1389143621613391952> and verify to gain access to all channels.\n"
+                    f"🎫 *Note: Open a ticket and verify your Rainbet account to receive the **Rainbet** role.*"
                 )
             except discord.Forbidden:
-                await message.channel.send(
-                    "❌ I don't have permission to change your nickname or assign the verification role."
-                )
+                await message.channel.send("❌ I don't have permission to change your nickname or assign the role.")
             except discord.HTTPException as e:
-                await message.channel.send(
-                    f"❌ We couldn’t verify your Kick username. Please check and try again. `{e}`"
-                )
+                await message.channel.send(f"❌ Could not verify username. `{e}`")
         else:
-            await message.channel.send(
-                "❌ Please send your Kick username (1–32 characters) to complete verification."
+            await message.channel.send("❌ Please send your Kick username (1–32 characters) to complete verification.")
+
+        return  # 🛑 Stop here so it doesn’t process commands/guesses
+
+    # 🎯 GTB game handling
+    if message.channel.id in ALLOWED_CHANNEL_IDS:
+        cursor.execute("SELECT active FROM gtb_state WHERE id = 1")
+        result = cursor.fetchone()
+        if not result or result[0] == 0:
+            return
+
+        content = message.content.strip().replace(",", "")
+        try:
+            guess = float(content)
+        except ValueError:
+            await message.delete()
+            await message.channel.send(f"{message.author.mention}, please enter a valid number like `420.69`.")
+            return
+
+        if guess <= 0 or guess > 1_000_000:
+            await message.delete()
+            await message.channel.send(f"{message.author.mention}, your guess must be between 1 and 1,000,000.")
+            return
+
+        cursor.execute("SELECT 1 FROM gtb_guesses WHERE user_id = ?", (message.author.id,))
+        if cursor.fetchone():
+            await message.delete()
+            await message.channel.send(f"{message.author.mention}, you've already submitted a guess.")
+            return
+
+        try:
+            cursor.execute(
+                "INSERT INTO gtb_guesses (user_id, username, guess) VALUES (?, ?, ?)",
+                (message.author.id, message.author.display_name, guess)
             )
+            conn.commit()
+        except Exception as e:
+            await message.channel.send(f"❌ Error saving guess: `{e}`")
+            return
 
-        return  # Prevent further processing for this message
+        await message.channel.send(f"{message.author.mention} guessed **${guess:,.2f}** ✅")
 
-    if message.channel.id not in ALLOWED_CHANNEL_IDS:
-        return
+    # ✅ Always call this at the very end
+    await bot.process_commands(message)
 
-    # Check if GTB is active
-    cursor.execute("SELECT active FROM gtb_state WHERE id = 1")
-    result = cursor.fetchone()
-    if not result or result[0] == 0:
-        return
-
-    content = message.content.strip().replace(",", "")
-    try:
-        guess = float(content)
-    except ValueError:
-        await message.delete()
-        await message.channel.send(f"{message.author.mention}, please enter a valid number like `420.69`.")
-        return
-
-    if guess <= 0 or guess > 1_000_000:
-        await message.delete()
-        await message.channel.send(f"{message.author.mention}, your guess must be between 1 and 1,000,000.")
-        return
-
-    # Check for duplicate guess
-    cursor.execute("SELECT 1 FROM gtb_guesses WHERE user_id = ?", (message.author.id,))
-    if cursor.fetchone():
-        await message.delete()
-        await message.channel.send(f"{message.author.mention}, you've already submitted a guess.")
-        return
-
-    # Save guess to DB
-    try:
-        cursor.execute(
-            "INSERT INTO gtb_guesses (user_id, username, guess) VALUES (?, ?, ?)",
-            (message.author.id, message.author.display_name, guess)
-        )
-        conn.commit()
-    except Exception as e:
-        await message.channel.send(f"❌ Error saving guess: `{e}`")
-        return
-
-    await message.channel.send(f"{message.author.mention} guessed **${guess:,.2f}** ✅")
 
 async def rainbet_username_autocomplete(
     interaction: discord.Interaction,
@@ -258,7 +267,7 @@ async def wager_leaderboard(interaction: discord.Interaction, page: Optional[int
     offset = (page - 1) * items_per_page  # Calculate the offset for pagination
 
     # Database connection and query
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect('west.db')
     cursor = conn.cursor()
 
     # Fetch leaderboard data (use discord_id instead of viewer_name)
@@ -374,7 +383,7 @@ async def generate_wager_leaderboard_embeds(interaction: discord.Interaction, pa
     offset = (page - 1) * items_per_page
 
     # Database connection and query
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect('west.db')
     c = conn.cursor()
 
     cursor.execute('''
@@ -651,7 +660,7 @@ ICON_SIZE = 100
 GRID_SIZE = 5
 PADDING = 10
 WILD_IMAGE = "bingo_icons/wild.webp"
-DB_PATH = "/mnt/data/west.db" if os.path.exists("/mnt/data") else "west.db"
+DB_PATH = "west.db"
 
 SLOT_NAMES = ["2 Wild 2 Die", "5 Lions Megaways", "Beast Below", "Benny the Beer", "Big Bass Bonanza", "Book of Time", "Bouncy Bombs", "Chicken Man",
     "Cloud Princess", "Cursed Seas", "Dark Summoning", "Densho", "Donny Dough", "Donut Division", "Dork Unit", "Dragon's Domain", "Evil Eyes",
@@ -714,7 +723,7 @@ from PIL import ImageFont
 
 def build_bingo_image(card, marked_slots=[]):
     letters = ["B", "O", "N", "U", "S"]
-    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+    font = ImageFont.truetype("arial.ttf", 36)
 
     header_height = 50
     img_width = ICON_SIZE * GRID_SIZE + PADDING * (GRID_SIZE + 1)
@@ -836,7 +845,7 @@ class BingoBonus(commands.Cog):
     @app_commands.describe(slot_name="Select slot to mark as played")
     async def mark_slot(self, interaction: discord.Interaction, slot_name: str):
         # Optional admin check
-        if interaction.user.id != 488015447417946151:
+        if interaction.user.id not in ADMIN_IDS:
             await interaction.response.send_message("⛔ Only the admin can mark slots.", ephemeral=True)
             return
 
@@ -897,6 +906,56 @@ class BingoBonus(commands.Cog):
             for slot in slots[:25]
         ]
 
+    @app_commands.command(name="unmark_slot", description="Unmark a slot (admin only)")
+    @app_commands.describe(slot_name="Slot to unmark")
+    async def unmark_slot(self, interaction: discord.Interaction, slot_name: str):
+        # Optional admin check
+        if interaction.user.id not in ADMIN_IDS:
+            await interaction.response.send_message("⛔ Only the admin can unmark slots.", ephemeral=True)
+            return
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT is_marked FROM slots WHERE slot_name = ?", (slot_name,))
+        row = cursor.fetchone()
+
+        if not row:
+            await interaction.response.send_message(f"❌ Slot '{slot_name}' not found.", ephemeral=True)
+            return
+
+        if row[0] == 0:
+            await interaction.response.send_message(f"⚠️ **{slot_name}** is already unmarked.", ephemeral=True)
+            return
+
+        # Unmark the slot
+        cursor.execute("UPDATE slots SET is_marked = 0 WHERE slot_name = ?", (slot_name,))
+        self.conn.commit()
+
+        # Tag users who have this slot
+        cursor.execute("SELECT user_id, card FROM bingo_cards")
+        tagged_users = []
+        for user_id, card_json in cursor.fetchall():
+            card = json.loads(card_json)
+            if any(slot_name in row for row in card):
+                tagged_users.append(f"<@{user_id}>")
+
+        tags = ", ".join(tagged_users) if tagged_users else "*No players have this slot.*"
+        await interaction.response.send_message(
+            f"❎ Unmarked **{slot_name}** as not bonused anymore.\n\n🔔 **Affected Players:** {tags}"
+        )
+
+        # Then show leaderboard again
+        await show_leaderboard(interaction)
+
+    @unmark_slot.autocomplete("slot_name")
+    async def unmark_slot_autocomplete(self, interaction: discord.Interaction, current: str):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT slot_name FROM slots WHERE is_marked = 1 AND slot_name LIKE ?", (f"%{current}%",))
+        slots = cursor.fetchall()
+        return [
+            app_commands.Choice(name=slot[0], value=slot[0])
+            for slot in slots[:25]
+        ]
+
     def check_for_winners(self):
         cursor = self.conn.cursor()
         cursor.execute("SELECT user_id, card FROM bingo_cards")
@@ -930,7 +989,7 @@ class BingoBonus(commands.Cog):
 
     @app_commands.command(name="bingo_bonus_hunt", description="List all unmarked slots to be played (random order)")
     async def bingo_bonus_hunt(self, interaction: discord.Interaction):
-        if interaction.user.id != 488015447417946151:
+        if interaction.user.id not in ADMIN_IDS:
             await interaction.response.send_message("⛔ Only the admin can use this command.", ephemeral=True)
             return
 
@@ -959,15 +1018,27 @@ class BingoBonus(commands.Cog):
             return embed
 
         class HuntPaginator(View):
-            def __init__(self):
-                super().__init__(timeout=120)
+            def __init__(self, ctx_id, user):
+                super().__init__(timeout=None)
+                self.ctx_id = ctx_id
+                self.user = user
                 self.page = 0
+                self.message = None
+
+            def is_valid_context(self, interaction):
+                return self.message and self.message.id == LAST_HUNT_MESSAGE.get(self.ctx_id)
 
             @discord.ui.button(label="⏮ Prev", style=discord.ButtonStyle.gray)
             async def prev_button(self, interaction_button: discord.Interaction, button: Button):
-                if interaction.user != interaction_button.user:
+                if interaction_button.user.id != self.user.id:
                     return await interaction_button.response.send_message(
                         "❌ Only the command user can control pagination.", ephemeral=True)
+
+                if not self.is_valid_context(interaction_button):
+                    return await interaction_button.response.send_message(
+                        "❌ This hunt session is outdated. Run `/bingo_bonus_hunt` again to see the updated list.",
+                        ephemeral=True
+                    )
 
                 if self.page > 0:
                     self.page -= 1
@@ -975,15 +1046,25 @@ class BingoBonus(commands.Cog):
 
             @discord.ui.button(label="⏭ Next", style=discord.ButtonStyle.gray)
             async def next_button(self, interaction_button: discord.Interaction, button: Button):
-                if interaction.user != interaction_button.user:
+                if interaction_button.user.id != self.user.id:
                     return await interaction_button.response.send_message(
                         "❌ Only the command user can control pagination.", ephemeral=True)
+
+                if not self.is_valid_context(interaction_button):
+                    return await interaction_button.response.send_message(
+                        "❌ This hunt session is outdated. Run `/bingo_bonus_hunt` again to see the updated list.",
+                        ephemeral=True
+                    )
 
                 if self.page < total_pages - 1:
                     self.page += 1
                     await interaction_button.response.edit_message(embed=get_page_embed(self.page), view=self)
 
-        await interaction.response.send_message(embed=get_page_embed(0), view=HuntPaginator(), ephemeral=False)
+        # Show first page
+        view = HuntPaginator(interaction.guild_id, interaction.user)
+        await interaction.response.send_message(embed=get_page_embed(0), view=view)
+        view.message = await interaction.original_response()
+        LAST_HUNT_MESSAGE[interaction.guild_id] = view.message.id
 
     @app_commands.command(name="bingo_bonus_reset", description="⚠️ Reset all marked slots and bingo cards")
     async def bingo_bonus_reset(self, interaction: discord.Interaction):
@@ -1027,6 +1108,17 @@ class BingoBonus(commands.Cog):
             view=view,
             ephemeral=True
         )
+
+# === BOT SETUP ===
+class BingoBot(commands.Bot):
+    async def setup_hook(self):
+        await self.add_cog(BingoBonus(self))
+        self.tree.add_command(bingo_bonus_rules)
+        await self.tree.sync()
+        print("✅ Slash commands synced.")
+
+intents = discord.Intents.default()
+bot = BingoBot(command_prefix="/", intents=intents)
 
 def initialize_slots_table(conn):
     cursor = conn.cursor()
