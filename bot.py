@@ -999,7 +999,7 @@ class BingoBonus(commands.Cog):
 
         return winners
 
-   @app_commands.command(name="bingo_bonus_hunt", description="List all unmarked slots to be played (random order)")
+       @app_commands.command(name="bingo_bonus_hunt", description="List all unmarked slots to be played (random order)")
     async def bingo_bonus_hunt(self, interaction: discord.Interaction):
         if interaction.user.id not in ADMIN_IDS:
             await interaction.response.send_message("⛔ Only the admin can use this command.", ephemeral=True)
@@ -1029,7 +1029,7 @@ class BingoBonus(commands.Cog):
             )
             return embed
 
-                class HuntPaginator(View):
+        class HuntPaginator(View):
             def __init__(self, ctx_id, user):
                 super().__init__(timeout=None)
                 self.ctx_id = ctx_id
