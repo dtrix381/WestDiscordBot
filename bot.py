@@ -21,11 +21,16 @@ import shutil
 LOCAL_DB = os.path.join(os.path.dirname(__file__), "west.db")
 RENDER_DB = "/mnt/data/west.db"
 
-# ✅ Only copy the local DB to /mnt/data if we're on Render and it doesn't exist
 if os.getenv("RENDER") and not os.path.exists(RENDER_DB):
-    print("Uploading local DB to /mnt/data...")
-    shutil.copyfile(LOCAL_DB, RENDER_DB)
-    print("Upload complete.")
+    try:
+        os.makedirs("/mnt/data", exist_ok=True)
+    except PermissionError:
+        print("⚠️ Warning: Cannot create /mnt/data (permission denied). Skipping DB copy.")
+    else:
+        print("Uploading local DB to /mnt/data...")
+        shutil.copyfile(LOCAL_DB, RENDER_DB)
+        print("Upload complete.")
+
     
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
