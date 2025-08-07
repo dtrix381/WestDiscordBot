@@ -18,7 +18,19 @@ from PIL import Image, ImageDraw, ImageFont
 from discord.ui import View, Button
 import shutil
 
- 
+LOCAL_DB = os.path.join(os.path.dirname(__file__), "west.db")
+RENDER_DB = "/mnt/data/west.db"
+
+if os.getenv("RENDER") and not os.path.exists(RENDER_DB):
+    try:
+        os.makedirs("/mnt/data", exist_ok=True)
+    except PermissionError:
+        print("⚠️ Warning: Cannot create /mnt/data (permission denied). Skipping DB copy.")
+    else:
+        print("Uploading local DB to /mnt/data...")
+        shutil.copyfile(LOCAL_DB, RENDER_DB)
+        print("Upload complete.")
+     
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
