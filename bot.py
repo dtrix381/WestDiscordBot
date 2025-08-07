@@ -16,7 +16,14 @@ import sqlite3, json, os
 from PIL import Image
 from PIL import Image, ImageDraw, ImageFont
 from discord.ui import View, Button
+import shutil
 
+# Only copy if on Render and DB doesn't exist yet
+if os.getenv("RENDER") and not os.path.exists(RENDER_DB):
+    print("Uploading local DB to /mnt/data...")
+    shutil.copyfile(LOCAL_DB, RENDER_DB)
+    print("Upload complete.")
+    
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
@@ -779,6 +786,7 @@ class BingoBonus(commands.Cog):
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS bingo_cards (
                 user_id TEXT PRIMARY KEY,
+                username TEXT,
                 card TEXT
             )
         """)
@@ -812,7 +820,7 @@ class BingoBonus(commands.Cog):
             return
 
         card = generate_bingo_card(self.conn)
-        cursor.execute("INSERT INTO bingo_cards (user_id, card) VALUES (?, ?)", (user_id, json.dumps(card)))
+        cursor.execute("INSERT INTO bingo_cards (user_id, username, card) VALUES (?, ?, ?)", (user_id, username, json.dumps(card)))
         self.conn.commit()
         await interaction.followup.send("✅ Card created! Use `/bingo_bonus_card` to view it.", ephemeral=True)
 
@@ -999,7 +1007,7 @@ class BingoBonus(commands.Cog):
 
         return winners
 
-       @app_commands.command(name="bingo_bonus_hunt", description="List all unmarked slots to be played (random order)")
+    @app_commands.command(name="bingo_bonus_hunt", description="List all unmarked slots to be played (random order)")
     async def bingo_bonus_hunt(self, interaction: discord.Interaction):
         if interaction.user.id not in ADMIN_IDS:
             await interaction.response.send_message("⛔ Only the admin can use this command.", ephemeral=True)
