@@ -22,10 +22,15 @@ LOCAL_DB = "west.db"
 RENDER_DB = "/mnt/data/west.db"
 
 # Only copy if on Render and DB doesn't exist yet
-if os.getenv("RENDER") and not os.path.exists(RENDER_DB):
-    print("Uploading local DB to /mnt/data...")
-    shutil.copyfile(LOCAL_DB, RENDER_DB)
-    print("Upload complete.")
+if os.getenv("RENDER"):
+    if not os.path.exists(LOCAL_DB):
+        raise FileNotFoundError(f"Local DB '{LOCAL_DB}' not found in project root.")
+
+    if not os.path.exists(RENDER_DB):
+        print("Uploading local DB to /mnt/data...")
+        shutil.copyfile(LOCAL_DB, RENDER_DB)
+        print("Upload complete.")
+
     
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
