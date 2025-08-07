@@ -18,6 +18,9 @@ from PIL import Image, ImageDraw, ImageFont
 from discord.ui import View, Button
 import shutil
 
+LOCAL_DB = "west.db"
+RENDER_DB = "/mnt/data/west.db"
+
 # Only copy if on Render and DB doesn't exist yet
 if os.getenv("RENDER") and not os.path.exists(RENDER_DB):
     print("Uploading local DB to /mnt/data...")
