@@ -904,18 +904,7 @@ class BingoBonus(commands.Cog):
                     f"🏆 **BINGO BONUS WINNERS!** 🏆\n\n🎉 Congrats {mentions} — you just completed a winning pattern!\nEvent ends here!"
                 )
 
-    # Autocomplete for slot names
-    @mark_slot.autocomplete("slot_name")
-    async def mark_slot_autocomplete(self, interaction: discord.Interaction, current: str):
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT slot_name FROM slots WHERE is_marked = 0 AND slot_name LIKE ?", (f"%{current}%",))
-        slots = cursor.fetchall()
-        return [
-            app_commands.Choice(name=slot[0], value=slot[0])
-            for slot in slots[:25]
-        ]
-
-    # Autocomplete for slot names
+   # Autocomplete for slot names
     @mark_slot.autocomplete("slot_name")
     async def mark_slot_autocomplete(self, interaction: discord.Interaction, current: str):
         cursor = self.conn.cursor()
