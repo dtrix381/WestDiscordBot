@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from discord.ui import View, Button
 import shutil
 
-LOCAL_DB = "west.db"
+LOCAL_DB = os.path.join(os.path.dirname(__file__), "west.db")
 RENDER_DB = "/mnt/data/west.db"
 
 # Only copy if on Render and DB doesn't exist yet
