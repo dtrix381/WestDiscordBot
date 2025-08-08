@@ -57,7 +57,7 @@ ADMIN_IDS = [
     1259041735514918952   # add as many as you like
 ]
 
-ALLOWED_COMMANDS = ["/bingo_bonus_join", "/bingo_bonus_card"]
+ALLOWED_COMMANDS = ["/bingo_bonus_join", "/bingo_bonus_card", "/bingo_bonus_rules"]
 RESTRICTED_CHANNEL_ID = 1401920349402042449  # Replace with your channel ID
 
 # Global variables
@@ -118,6 +118,13 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS gtb_state (
     active INTEGER DEFAULT 0
 )''')
 
+cursor.execute('''CREATE TABLE IF NOT EXISTS persistent_hunt (
+    guild_id INTEGER PRIMARY KEY,
+    message_id INTEGER,
+    channel_id INTEGER,
+    user_id INTEGER
+)''')
+
 cursor.execute('INSERT OR IGNORE INTO gtb_state (id, active) VALUES (1, 0)')
 cursor.execute('INSERT OR IGNORE INTO gtb_balances (id, starting_balance, final_balance) VALUES (1, NULL, NULL)')
 conn.commit()
@@ -125,14 +132,42 @@ conn.commit()
 
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user.name}')
+    print(f'✅ Logged in as {bot.user.name}')
+
     try:
-        await bot.add_cog(BingoBonus(bot))  # ✅ Add the Bingo cog here
+        # Load Bingo cog
+        await bot.add_cog(BingoBonus(bot))
         bot.tree.add_command(bingo_bonus_rules)
+
+        # Sync slash commands
         synced = await bot.tree.sync()
-        print(f'Synced {len(synced)} commands')
+        print(f'🔄 Synced {len(synced)} commands')
+
+        # ✅ Restore persistent /bingo_bonus_hunt buttons
+        cursor = bot.conn.cursor()
+        cursor.execute("SELECT guild_id, message_id, channel_id, user_id FROM persistent_hunt")
+        rows = cursor.fetchall()
+
+        for guild_id, message_id, channel_id, user_id in rows:
+            guild = bot.get_guild(guild_id)
+            if guild:
+                channel = guild.get_channel(channel_id)
+                if channel:
+                    try:
+                        msg = await channel.fetch_message(message_id)
+                        member = guild.get_member(user_id)
+                        if member:
+                            view = HuntPaginator(guild_id, member, bot.conn)
+                            view.message = msg
+                            await msg.edit(view=view)
+                            print(f"🔄 Restored hunt paginator in {guild.name}")
+                        else:
+                            print(f"⚠️ Could not find member {user_id} in {guild.name}")
+                    except Exception as e:
+                        print(f"⚠️ Could not restore hunt paginator in {guild.name}: {e}")
+
     except Exception as e:
-        print(f'Error syncing commands: {e}')
+        print(f'❌ Error in on_ready: {e}')
 
 
 
@@ -146,7 +181,7 @@ async def on_message(message: discord.Message):
         if not any(message.content.strip().startswith(cmd) for cmd in ALLOWED_COMMANDS):
             await message.delete()
             await message.channel.send(
-                f"❌ {message.author.mention}, only `/bingo_bonus_join` and `/bingo_bonus_card` commands are allowed in this channel.",
+                f"❌ {message.author.mention}, only `/bingo_bonus_join` `/bingo_bonus_card` and `/bingo_bonus_rules` commands are allowed in this channel.",
                 delete_after=6
             )
             return
@@ -806,17 +841,41 @@ class BingoBonus(commands.Cog):
     async def bingo_bonus_join(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        user_id = str(interaction.user.id)
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT 1 FROM bingo_cards WHERE user_id = ?", (user_id,))
-        if cursor.fetchone():
-            await interaction.followup.send("🎟️ You already have a Bingo Bonus card! Use `/bingo_bonus_card`.", ephemeral=True)
-            return
+        try:
+            user_id = str(interaction.user.id)
+            username = interaction.user.name  # ✅ Get username
 
-        card = generate_bingo_card(self.conn)
-        cursor.execute("INSERT INTO bingo_cards (user_id, username, card) VALUES (?, ?, ?)", (user_id, username, json.dumps(card)))
-        self.conn.commit()
-        await interaction.followup.send("✅ Card created! Use `/bingo_bonus_card` to view it.", ephemeral=True)
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT 1 FROM bingo_cards WHERE user_id = ?", (user_id,))
+            if cursor.fetchone():
+                await interaction.followup.send(
+                    "🎟️ You already have a Bingo Bonus card! Use `/bingo_bonus_card`.",
+                    ephemeral=True
+                )
+                return
+
+            # ✅ Generate new card
+            card = generate_bingo_card(self.conn)
+
+            # ✅ Insert into DB
+            cursor.execute(
+                "INSERT INTO bingo_cards (user_id, username, card) VALUES (?, ?, ?)",
+                (user_id, username, json.dumps(card))
+            )
+            self.conn.commit()
+
+            await interaction.followup.send(
+                "✅ Card created! Use `/bingo_bonus_card` to view it.",
+                ephemeral=True
+            )
+
+        except Exception as e:
+            print(f"❌ Error in /bingo_bonus_join: {e}")
+            await interaction.followup.send(
+                "⚠️ An error occurred while creating your card. Please try again.",
+                ephemeral=True
+            )
+
 
     @app_commands.command(name="bingo_bonus_card", description="Show your Bingo Bonus card")
     async def bingo_bonus_card(self, interaction: discord.Interaction):
@@ -990,84 +1049,94 @@ class BingoBonus(commands.Cog):
 
         return winners
 
-    @app_commands.command(name="bingo_bonus_hunt", description="List all unmarked slots to be played (random order)")
-    async def bingo_bonus_hunt(self, interaction: discord.Interaction):
-        if interaction.user.id not in ADMIN_IDS:
-            await interaction.response.send_message("⛔ Only the admin can use this command.", ephemeral=True)
-            return
+@app_commands.command(name="bingo_bonus_hunt", description="List all unmarked slots to be played (random order)")
+async def bingo_bonus_hunt(self, interaction: discord.Interaction):
+    if interaction.user.id not in ADMIN_IDS:
+        await interaction.response.send_message("⛔ Only the admin can use this command.", ephemeral=True)
+        return
 
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT slot_name FROM slots WHERE is_marked = 0")
-        unmarked_slots = [row[0] for row in cursor.fetchall()]
+    cursor = self.conn.cursor()
+    cursor.execute("SELECT slot_name FROM slots WHERE is_marked = 0")
+    unmarked_slots = [row[0] for row in cursor.fetchall()]
 
-        if not unmarked_slots:
-            await interaction.response.send_message("✅ All slots have been marked already.", ephemeral=True)
-            return
+    if not unmarked_slots:
+        await interaction.response.send_message("✅ All slots have been marked already.", ephemeral=True)
+        return
 
-        random.shuffle(unmarked_slots)
-        slots_per_page = 15
-        total_pages = math.ceil(len(unmarked_slots) / slots_per_page)
+    random.shuffle(unmarked_slots)
+    slots_per_page = 15
+    total_pages = math.ceil(len(unmarked_slots) / slots_per_page)
 
-        def get_page_embed(page):
-            start = page * slots_per_page
-            end = start + slots_per_page
-            chunk = unmarked_slots[start:end]
-            description = "\n".join(f"{start + j + 1}. {slot}" for j, slot in enumerate(chunk))
-            embed = discord.Embed(
-                title=f"🎯 Bingo Bonus Hunt — Page {page + 1}/{total_pages}",
-                description=description,
-                color=discord.Color.orange()
-            )
-            return embed
+    def get_page_embed(page):
+        start = page * slots_per_page
+        end = start + slots_per_page
+        chunk = unmarked_slots[start:end]
+        description = "\n".join(f"{start + j + 1}. {slot}" for j, slot in enumerate(chunk))
+        embed = discord.Embed(
+            title=f"🎯 Bingo Bonus Hunt — Page {page + 1}/{total_pages}",
+            description=description,
+            color=discord.Color.orange()
+        )
+        return embed
 
-        class HuntPaginator(View):
-            def __init__(self, ctx_id, user):
-                super().__init__(timeout=None)
-                self.ctx_id = ctx_id
-                self.user = user
-                self.page = 0
-                self.message = None
+    class HuntPaginator(View):
+        def __init__(self, ctx_id, user, conn):
+            super().__init__(timeout=None)
+            self.ctx_id = ctx_id
+            self.user = user
+            self.page = 0
+            self.message = None
+            self.conn = conn
 
-            def is_valid_context(self, interaction):
-                return self.message and self.message.id == LAST_HUNT_MESSAGE.get(self.ctx_id)
+        def is_valid_context(self, interaction):
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT message_id FROM persistent_hunt WHERE guild_id = ?", (self.ctx_id,))
+            row = cursor.fetchone()
+            return row and self.message and self.message.id == row[0]
 
-            @discord.ui.button(label="⏮ Prev", style=discord.ButtonStyle.gray)
-            async def prev_button(self, interaction_button: discord.Interaction, button: Button):
-                if interaction_button.user.id != self.user.id:
-                    return await interaction_button.response.send_message(
-                        "❌ Only the command user can control pagination.", ephemeral=True)
+        @discord.ui.button(label="⏮ Prev", style=discord.ButtonStyle.gray)
+        async def prev_button(self, interaction_button: discord.Interaction, button: Button):
+            if interaction_button.user.id != self.user.id:
+                return await interaction_button.response.send_message(
+                    "❌ Only the command user can control pagination.", ephemeral=True)
 
-                if not self.is_valid_context(interaction_button):
-                    return await interaction_button.response.send_message(
-                        "❌ This hunt session is outdated. Run `/bingo_bonus_hunt` again to see the updated list.",
-                        ephemeral=True
-                    )
+            if not self.is_valid_context(interaction_button):
+                return await interaction_button.response.send_message(
+                    "❌ This hunt session is outdated. Run `/bingo_bonus_hunt` again to see the updated list.",
+                    ephemeral=True
+                )
 
-                if self.page > 0:
-                    self.page -= 1
-                    await interaction_button.response.edit_message(embed=get_page_embed(self.page), view=self)
+            if self.page > 0:
+                self.page -= 1
+                await interaction_button.response.edit_message(embed=get_page_embed(self.page), view=self)
 
-            @discord.ui.button(label="⏭ Next", style=discord.ButtonStyle.gray)
-            async def next_button(self, interaction_button: discord.Interaction, button: Button):
-                if interaction_button.user.id != self.user.id:
-                    return await interaction_button.response.send_message(
-                        "❌ Only the command user can control pagination.", ephemeral=True)
+        @discord.ui.button(label="⏭ Next", style=discord.ButtonStyle.gray)
+        async def next_button(self, interaction_button: discord.Interaction, button: Button):
+            if interaction_button.user.id != self.user.id:
+                return await interaction_button.response.send_message(
+                    "❌ Only the command user can control pagination.", ephemeral=True)
 
-                if not self.is_valid_context(interaction_button):
-                    return await interaction_button.response.send_message(
-                        "❌ This hunt session is outdated. Run `/bingo_bonus_hunt` again to see the updated list.",
-                        ephemeral=True
-                    )
+            if not self.is_valid_context(interaction_button):
+                return await interaction_button.response.send_message(
+                    "❌ This hunt session is outdated. Run `/bingo_bonus_hunt` again to see the updated list.",
+                    ephemeral=True
+                )
 
-                if self.page < total_pages - 1:
-                    self.page += 1
-                    await interaction_button.response.edit_message(embed=get_page_embed(self.page), view=self)
+            if self.page < total_pages - 1:
+                self.page += 1
+                await interaction_button.response.edit_message(embed=get_page_embed(self.page), view=self)
 
-        # Show first page
-        view = HuntPaginator(interaction.guild_id, interaction.user)
-        await interaction.response.send_message(embed=get_page_embed(0), view=view)
-        view.message = await interaction.original_response()
-        LAST_HUNT_MESSAGE[interaction.guild_id] = view.message.id
+    # Show first page
+    view = HuntPaginator(interaction.guild_id, interaction.user, self.conn)
+    await interaction.response.send_message(embed=get_page_embed(0), view=view)
+    view.message = await interaction.original_response()
+
+    # ✅ Save in DB
+    cursor.execute("""
+        INSERT OR REPLACE INTO persistent_hunt (guild_id, message_id, channel_id, user_id)
+        VALUES (?, ?, ?, ?)
+    """, (interaction.guild_id, view.message.id, interaction.channel.id, interaction.user.id))
+    self.conn.commit()
 
     @app_commands.command(name="bingo_bonus_reset", description="⚠️ Reset all marked slots and bingo cards")
     async def bingo_bonus_reset(self, interaction: discord.Interaction):
