@@ -58,7 +58,7 @@ ADMIN_IDS = [
     1259041735514918952   # add as many as you like
 ]
 
-ALLOWED_COMMANDS = ["/bingo_bonus_join", "/bingo_bonus_card", "/bingo_bonus_rules"]
+ALLOWED_COMMANDS = ["/", "/bingo_bonus_card", "/bingo_bonus_rules"]
 RESTRICTED_CHANNEL_ID = 1401920349402042449  # Replace with your channel ID
 
 # Global variables
@@ -150,11 +150,12 @@ async def on_ready():
     print(f'✅ Logged in as {bot.user.name}')
 
     try:
+        # Load the BingoBonus Cog first
         await bot.add_cog(BingoBonus(bot))
-        bot.tree.add_command(bingo_bonus_rules)
         synced = await bot.tree.sync()
         print(f'🔄 Synced {len(synced)} commands')
 
+        # Now restore persistent hunt paginator
         cursor = bot.conn.cursor()
         cursor.execute("SELECT guild_id, message_id, channel_id, user_id, slots_json, page FROM persistent_hunt")
         rows = cursor.fetchall()
@@ -176,7 +177,7 @@ async def on_ready():
                     continue
 
                 slots = json.loads(slots_json)
-                view = HuntPaginator(guild_id, member, slots, conn=bot.conn)
+                view = BingoBonus.HuntPaginator(guild_id, member, slots, conn=bot.conn)
                 view.page = page
                 view.message = msg
                 await msg.edit(embed=view.get_page_embed(), view=view)
@@ -188,6 +189,7 @@ async def on_ready():
     except Exception as e:
         print(f'❌ Error in on_ready: {e}')
 
+
 @bot.event
 async def on_message(message: discord.Message):
     if message.author.bot:
@@ -198,7 +200,7 @@ async def on_message(message: discord.Message):
         if not any(message.content.strip().startswith(cmd) for cmd in ALLOWED_COMMANDS):
             await message.delete()
             await message.channel.send(
-                f"❌ {message.author.mention}, only `/bingo_bonus_join` `/bingo_bonus_card` and `/bingo_bonus_rules` commands are allowed in this channel.",
+                f"❌ {message.author.mention}, only `/` `/bingo_bonus_card` and `/bingo_bonus_rules` commands are allowed in this channel.",
                 delete_after=6
             )
             return
