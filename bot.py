@@ -1181,31 +1181,32 @@ class BingoBonus(commands.Cog):
             ephemeral=True
         )
 
-def initialize_slots_table(conn):
-    cursor = conn.cursor()
-    for slot in SLOT_NAMES:
-        cursor.execute("INSERT OR IGNORE INTO slots (slot_name) VALUES (?)", (slot,))
-    conn.commit()
+    def initialize_slots_table(conn):
+        cursor = conn.cursor()
+        for slot in SLOT_NAMES:
+            cursor.execute("INSERT OR IGNORE INTO slots (slot_name) VALUES (?)", (slot,))
+        conn.commit()
 
-@app_commands.command(name="bingo_bonus_rules", description="Show the Bingo Bonus rules and winning patterns")
-async def bingo_bonus_rules(self, interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🎯 BINGO BONUS RULES",
-        description=(
-            "**Whenever West is on a Bonus Hunt Event, the WEST BINGO BONUS is active!**\n\n"
-            "🟡 **Only 75 slots** from the Bingo Cards will be played.\n"
-            "🟡 For fairness, West will use the `/bingo_hunt` command to determine the slots order to play.\n"
-            "🟡 West can end the hunt at any time.\n"
-            "🟡 If he hunts again on a different day, he must run `/bingo_hunt` again to get new slots order to play.\n"
-            "🟡 The event continues **until someone completes one of the winning patterns**.\n\n"
-            "📌 Below are the **12 Winning Patterns** you need to complete to win!"
-        ),
-        color=discord.Color.gold()
-    )
-    embed.set_image(url="attachment://winning_patterns.png")
+    @app_commands.command(name="bingo_bonus_rules", description="Show the Bingo Bonus rules and winning patterns")
+    async def bingo_bonus_rules(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="🎯 BINGO BONUS RULES",
+            description=(
+                "**Whenever West is on a Bonus Hunt Event, the WEST BINGO BONUS is active!**\n\n"
+                "🟡 **Only 75 slots** from the Bingo Cards will be played.\n"
+                "🟡 For fairness, West will use the `/bingo_hunt` command to determine the slots order to play.\n"
+                "🟡 West can end the hunt at any time.\n"
+                "🟡 If he hunts again on a different day, he must run `/bingo_hunt` again to get new slots order to play.\n"
+                "🟡 The event continues **until someone completes one of the winning patterns**.\n\n"
+                "📌 Below are the **12 Winning Patterns** you need to complete to win!"
+            ),
+            color=discord.Color.gold()
+        )
+        embed.set_image(url="attachment://winning_patterns.png")
 
-    file = discord.File("winning_patterns.png", filename="winning_patterns.png")
-    await interaction.response.send_message(embed=embed, file=file, ephemeral=False)
+        file = discord.File("winning_patterns.png", filename="winning_patterns.png")
+        await interaction.response.send_message(embed=embed, file=file, ephemeral=False)
+
 
 
 WINNING_PATTERNS = [
@@ -1266,5 +1267,6 @@ def get_top_players_close_to_win(conn, top_n=3, max_missing=4):
     player_progress.sort(key=lambda x: x[1])
 
     return player_progress[:top_n]
+    
 print("Loaded token:", TOKEN)
 bot.run(TOKEN)
