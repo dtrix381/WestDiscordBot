@@ -664,14 +664,14 @@ PADDING = 10
 WILD_IMAGE = "bingo_icons/wild.webp"
 DB_PATH = "/mnt/data/west.db" if os.path.exists("/mnt/data") else "west.db"
 
-SLOT_NAMES = ["2 Wild 2 Die", "5 Lions Megaways", "Beast Below", "Benny the Beer", "Big Bass Bonanza", "Book of Time", "Bouncy Bombs", "Chicken Man",
-    "Cloud Princess", "Cursed Seas", "Dark Summoning", "Densho", "Donny Dough", "Donut Division", "Dork Unit", "Dragon's Domain", "Evil Eyes",
-    "Extra Juicy", "Fear the Dark", "Fire Portals", "Fish Eye", "Fist of Destruction", "FRKN Bananas", "Fruit Party", "Fruit Party 2", "Fruity Treats",
+SLOT_NAMES = ["2 Wild 2 Die", "5 Lions Megaways", "5 Lions Megaways 2", "Beast Below", "Benny the Beer", "Big Bass Bonanza", "Book of Time", "Chicken Man",
+    "Cloud Princess", "Clumsy Cowboys", "Cursed Seas", "Dark Summoning", "Densho", "Donny Dough", "Donut Division", "Dork Unit", "Dragon's Domain",
+    "Extra Juicy", "Fear the Dark", "Fire Portals", "Fish Eye", "Fist of Destruction", "Forgotten", "FRKN Bananas", "Fruit Party", "Fruit Party 2", "Fruity Treats",
     "Gates of Olympus", "Gates of Olympus 1000", "Gates of Olympus Super Scatter", "Gemhalla", "Gems Bonanza", "Hand of Anubis", "Heart of Cleopatra",
     "Hoot Shot the Sheriff", "Hot Fiesta", "Hounds of Hell", "Jewel Rush", "Le Bandit", "Le King", "Le Pharaoh", "Le Viking", "Life and Death",
     "Madame Destiny Megaways", "Mayan Stackways", "Outsourced", "Phoenix DuelReels", "Pickle Bandit", "Pirate Bonanza", "Power of Thor Megaways",
-    "Pyrofox", "Rad Maxx", "Rise of Ymir", "Rotten", "SixSixSix", "Sky Bounty", "Slayers Inc", "Starlight Princess", "Starlight Princess 1000",
-    "Stormforged", "Sugar Rush", "Sugar Rush 1000", "Sugar Supreme Powernudge", "Sweet Bonanza 1000", "Ultimate Slot of America", "Vending Machine",
+    "Rad Maxx", "Rise of Ymir", "Rotten", "Seamen", "SixSixSix", "Sky Bounty", "Slayers Inc", "Starlight Princess", "Starlight Princess 1000",
+    "Sugar Rush", "Sugar Supreme Powernudge", "Sweet Bonanza 1000", "Tanked", "Ultimate Slot of America", "Vending Machine",
     "Wanted Dead or a Wild", "Wheel o'Gold", "Wild Bison Charge", "Wild West Gold", "Wild West Gold Blazing Bounty", "Wild West Gold Megaways",
     "Wings of Horus", "Wisdom of Athena 1000", "Zeus vs Hades Gods of War", "Ze Zeus"]
 
