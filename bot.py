@@ -1150,7 +1150,7 @@ async def db_download(interaction: discord.Interaction):
     if str(interaction.user.id) != "488015447417946151":
         await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
         return
-    await interaction.response.send_message(file=discord.File(DB_PATH, "west.db"))
+    await interaction.response.send_message(file=discord.File(DB_PATH, "west.db", ephemeral=True))
 
 @bot.tree.command(name="db_upload")
 async def db_upload(interaction: discord.Interaction, attachment: discord.Attachment):
@@ -1158,7 +1158,7 @@ async def db_upload(interaction: discord.Interaction, attachment: discord.Attach
         await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
         return
     await attachment.save(DB_PATH)
-    await interaction.response.send_message("✅ Database replaced successfully.")
+    await interaction.response.send_message("✅ Database replaced successfully.", ephemeral=True)
 
 print("Loaded token:", TOKEN)
 bot.run(TOKEN)
