@@ -22,7 +22,7 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 # === DYNAMIC DATABASE PATH ===
-DB_PATH = "/data/west.db" if os.path.exists("/data") else "west.db"
+DB_PATH = "/data/west.db"
 
 # Set up intents to read messages and manage messages
 intents = discord.Intents.default()
@@ -662,7 +662,7 @@ ICON_SIZE = 100
 GRID_SIZE = 5
 PADDING = 10
 WILD_IMAGE = "bingo_icons/wild.webp"
-DB_PATH = "/data/west.db" if os.path.exists("/data") else "west.db"
+DB_PATH = "/data/west.db" 
 
 SLOT_NAMES = ["2 Wild 2 Die", "5 Lions Megaways", "5 Lions Megaways 2", "Beast Below", "Benny the Beer", "Big Bass Bonanza", "Book of Time", "Chicken Man",
     "Cloud Princess", "Clumsy Cowboys", "Cursed Seas", "Dark Summoning", "Densho", "Donny Dough", "Donut Division", "Dork Unit", "Dragon's Domain",
