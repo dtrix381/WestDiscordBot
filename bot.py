@@ -1145,5 +1145,21 @@ def get_top_players_close_to_win(conn, top_n=3, max_missing=4):
     player_progress.sort(key=lambda x: x[1])
 
     return player_progress[:top_n]
+
+@bot.tree.command(name="db_download")
+async def db_download(interaction: discord.Interaction):
+    if str(interaction.user.id) != "488015447417946151":
+        await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+        return
+    await interaction.response.send_message(file=discord.File(DB_PATH, "west.db"))
+
+@bot.tree.command(name="db_upload")
+async def db_upload(interaction: discord.Interaction, attachment: discord.Attachment):
+    if str(interaction.user.id) != "488015447417946151":
+        await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+        return
+    await attachment.save(DB_PATH)
+    await interaction.response.send_message("✅ Database replaced successfully.")
+
 print("Loaded token:", TOKEN)
 bot.run(TOKEN)
