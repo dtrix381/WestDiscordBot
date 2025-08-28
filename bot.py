@@ -54,7 +54,7 @@ YOUR_DISCORD_ID = 1389128704055050343
 ADMIN_IDS = [
     488015447417946151,  # your main ID
     878253813553844254,  # example other admin
-    1259041735514918952   # add as many as you like
+    1259041735514918952, 930952408564129802, 1086900101605236776, 706338989749305405   # add as many as you like
 ]
 
 ALLOWED_COMMANDS = ["/bingo_bonus_join", "/bingo_bonus_card"]
@@ -214,6 +214,21 @@ async def on_message(message: discord.Message):
             return
 
         await message.channel.send(f"{message.author.mention} guessed **${guess:,.2f}** ✅")
+
+    # 🎤 Custom "!keyword" responses
+    responses = {
+        "Rowelie": "Bruv",
+        "Clamz": "hit me with a flying dildo",
+        "West832": "Ayooo",
+        "Mik": "PAY ME 🤑",
+        "Cuda": "ooosh churr",
+        "Teelux": "Mooo"
+    }
+
+    if message.content.startswith("!"):
+        key = message.content[1:].strip()
+        if key in responses:
+            await message.channel.send(responses[key])
 
     # ✅ Always call this at the very end
     await bot.process_commands(message)
@@ -665,14 +680,14 @@ WILD_IMAGE = "bingo_icons/wild.webp"
 DB_PATH = "/data/west.db" 
 
 SLOT_NAMES = ["5 Lions Megaways", "5 Lions Megaways 2", "Beast Below", "Benny the Beer", "Big Bass Bonanza", "Blood Suckers", "Book of Tut Megaways", "Cash Chips", 
-    "Chicken Man", "Cloud Princess", "Club Tropicana", "Clumsy Cowboys", "Cursed Seas", "Dark Summoning", "Densho", "Donut Division", "Dork Unit", "Dragon's Domain", 
-    "Extra Juicy", "Fear the Dark", "Fire Portals", "Fish Eye", "Fist of Destruction", "Forgotten", "FRKN Bananas", "Fruit Party", "Fruit Party 2", "Fruity Treats", 
-    "Gates of Olympus", "Gates of Olympus 1000", "Gates of Olympus Super Scatter", "Gemhalla", "Gems Bonanza", "Great Rhino Megaways", "Heart of Cleopatra", 
-    "Hoot Shot the Sheriff", "Hounds of Hell", "Jewel Rush", "Le Bandit", "Le King", "Le Pharaoh", "Le Viking", "Life and Death", "Madame Destiny Megaways", 
-    "Mayan Stackways", "Outsourced", "Phoenix DuelReels", "Pirate Bonanza", "Power of Thor Megaways", "Rad Maxx", "Rainbow Princess", "Rise of Ymir", "Rotten", "Seamen", 
-    "SixSixSix", "Sky Bounty", "Slayers Inc", "Starlight Princess", "Starlight Princess 1000", "Sugar Supreme Powernudge", "Tanked", "The Luxe", "TNT Bonanza 2", 
-    "Ultimate Slot of America", "Wanted Dead or a Wild", "Wheel o'Gold", "Wild Bison Charge", "Wild West Gold", "Wild West Gold Blazing Bounty", "Wild West Gold Megaways", 
-    "Wings of Horus", "Wisdom of Athena 1000", "Zeus vs Hades Gods of War", "Ze Zeus", "Zombie School Megaways"]
+    "Chicken Man", "Cloud Princess", "Club Tropicana", "Clumsy Cowboys", "Cursed Seas", "Densho", "Donut Division", "Dork Unit", "Dragon's Domain", "Eastern Emeralds Megaways", 
+    "El Paso Gunfight xNudge", "Extra Juicy", "Fear the Dark", "Fire Portals", "Fist of Destruction", "Forgotten", "Fortune of Giza", "FRKN Bananas", "Fruit Party", "Fruit Party 2", 
+    "Fruity Treats", "Fury of Odin Megaways", "Gates of Olympus", "Gates of Olympus 1000", "Gates of Olympus Super Scatter", "Gemhalla", "Gems Bonanza", "Great Rhino Megaways", 
+    "Heart of Cleopatra", "Hounds of Hell", "Infernus", "Jewel Rush", "Le Bandit", "Le King", "Le Pharaoh", "Le Viking", "Life and Death", "Madame Destiny Megaways", 
+    "Mayan Stackways", "Phoenix DuelReels", "Pirate Bonanza", "Power of Thor Megaways", "Rad Maxx", "Rainbow Princess", "Rise of Ymir", "Rotten", "Seamen", "SixSixSix", 
+    "Sky Bounty", "Slayers Inc", "Starlight Princess", "Starlight Princess 1000", "Sugar Supreme Powernudge", "Tanked", "The Luxe", "TNT Bonanza 2", "Ultimate Slot of America", 
+    "Wanted Dead or a Wild", "Wheel o'Gold", "Wild Bison Charge", "Wild West Gold", "Wild West Gold Blazing Bounty", "Wild West Gold Megaways", "Wisdom of Athena 1000", 
+    "Zeus vs Hades Gods of War", "Ze Zeus", "Zombie School Megaways"]
 
 # === FUNCTIONS ===
 
