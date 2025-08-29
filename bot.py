@@ -237,12 +237,17 @@ async def on_message(message: discord.Message):
             text = response["text"]
             gif = response["gif"]
 
-            if gif and text:
-                await message.channel.send(f"{text}\n{gif}")
-            elif gif:  # gif only
-                await message.channel.send(gif)
+            embed = None
+            if gif:
+                embed = discord.Embed()
+                embed.set_image(url=gif)
+
+            if text and embed:
+                await message.channel.send(content=text, embed=embed)
+            elif embed:
+                await message.channel.send(embed=embed)
             else:
-                await message.channel.send(text)
+                await message.channel.send(content=text)
 
     # ✅ Always call this at the very end
     await bot.process_commands(message)
