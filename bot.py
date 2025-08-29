@@ -215,22 +215,33 @@ async def on_message(message: discord.Message):
 
         await message.channel.send(f"{message.author.mention} guessed **${guess:,.2f}** ✅")
 
-    # 🎤 Custom "!keyword" responses
-    responses = {
-        "Rowelie": "Bruv",
-        "Clamz": "hit me with a flying dildo",
-        "West832": "Ayooo",
-        "Mik": "PAY ME 🤑",
-        "Cuda": "ooosh churr",
-        "Teelux": "Mooo"
-    }
+    # Your response dictionary (text + gif url)
+responses = {
+    "Rowelie": {"text": "Bruv", "gif": "https://media1.tenor.com/m/NSGgOOqqH6UAAAAd/ponke-ponkesol.gif"},
+    "Clamz": {"text": "hit me with a flying dildo", "gif": "https://media1.tenor.com/m/eMA4ZsLnmVcAAAAd/thor-dildo.gif"},
+    "West832": {"text": "Ayooo", "gif": "https://media1.tenor.com/m/WYVmPdMPMYAAAAAd/the-simpsons-homer-simpson.gif"},
+    "Mik": {"text": "PAY ME 🤑", "gif": "https://media1.tenor.com/m/kir_8kal6zAAAAAd/protein-gym.gif"},
+    "Cuda": {"text": "ooosh churr", "gif": "https://media1.tenor.com/m/gLbIKd2iOkAAAAAd/blinking-seth-rogan.gif"},
+    "BarryJamesSpecial": {"text": "", "gif": "https://media1.tenor.com/m/piBncz6RjogAAAAd/work-workout.gif"},
+    "685": {"text": "", "gif": "https://media1.tenor.com/m/iY_Dmlw6IdMAAAAd/kefe-samoa.gif"},
+    "Tessa": {"text": "", "gif": "https://media1.tenor.com/m/TigvCqFjCCUAAAAd/run-woman.gif"},
+    "Del": {"text": "", "gif": "https://media1.tenor.com/m/5MZv_uf-RngAAAAd/kevin-hart-hart.gif"},
+    "Epik": {"text": "", "gif": "https://media1.tenor.com/m/H-S3bjgPL4EAAAAd/sad-upset.gif"},
+    "Teelux": {"text": "", "gif": "https://media1.tenor.com/m/11TdXYLq2usAAAAd/one-tree-hill-haley-james-scott.gif"}
+}
 
     if message.content.startswith("!"):
-        key = message.content[1:].strip()
-        if key in responses:
-            await message.channel.send(responses[key])
+        name = message.content[1:]  # remove the "!" prefix
+        if name in responses:
+            response = responses[name]
+            text = response["text"]
+            gif = response["gif"]
 
-    # ✅ Always call this at the very end
+            if gif:
+                await message.channel.send(f"{text}\n{gif}")
+            else:
+                await message.channel.send(text)
+
     await bot.process_commands(message)
 
 async def rainbet_username_autocomplete(
