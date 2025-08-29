@@ -217,37 +217,37 @@ async def on_message(message: discord.Message):
 
     # 🔹 Custom !commands
     responses = {
-        "Rowelie": {"text": "Bruv", "gif": "https://media1.tenor.com/m/NSGgOOqqH6UAAAAd/ponke-ponkesol.gif"},
-        "Clamz": {"text": "hit me with a flying dildo", "gif": "https://media1.tenor.com/m/eMA4ZsLnmVcAAAAd/thor-dildo.gif"},
-        "West832": {"text": "Ayooo", "gif": "https://media1.tenor.com/m/WYVmPdMPMYAAAAAd/the-simpsons-homer-simpson.gif"},
-        "Mik": {"text": "PAY ME 🤑", "gif": "https://media1.tenor.com/m/kir_8kal6zAAAAAd/protein-gym.gif"},
-        "Cuda": {"text": "ooosh churr", "gif": "https://media1.tenor.com/m/gLbIKd2iOkAAAAAd/blinking-seth-rogan.gif"},
-        "BarryJamesSpecial": {"text": "", "gif": "https://media1.tenor.com/m/piBncz6RjogAAAAd/work-workout.gif"},
-        "685": {"text": "", "gif": "https://media1.tenor.com/m/iY_Dmlw6IdMAAAAd/kefe-samoa.gif"},
-        "Tessa": {"text": "", "gif": "https://media1.tenor.com/m/TigvCqFjCCUAAAAd/run-woman.gif"},
-        "Del": {"text": "", "gif": "https://media1.tenor.com/m/5MZv_uf-RngAAAAd/kevin-hart-hart.gif"},
-        "Epik": {"text": "", "gif": "https://media1.tenor.com/m/H-S3bjgPL4EAAAAd/sad-upset.gif"},
-        "Teelux": {"text": "", "gif": "https://media1.tenor.com/m/11TdXYLq2usAAAAd/one-tree-hill-haley-james-scott.gif"}
+        "Rowelie": {"text": "Bruv", "gif": "Rowelie.gif"},
+        "Clamz": {"text": "hit me with a flying dildo", "gif": "Clamz.gif"},
+        "West832": {"text": "Ayooo", "gif": "West832.gif"},
+        "Mik": {"gif": "Mik.gif"},
+        "Cuda": {"text": "ooosh churr", "gif": "Cuda.gif"},
+        "BarryJamesSpecial": {"gif": "BarryJamesSpecial.gif"},
+        "685": {"gif": "685.gif"},
+        "Tessa": {"gif": "Tessa.gif"},
+        "Del": {"gif": "Del.gif"},
+        "Epik": {"gif": "Epik.gif"},
+        "Teelux": {"gif": "Teelux.gif"}
     }
 
     if message.content.startswith("!"):
         name = message.content[1:]  # remove the "!" prefix
         if name in responses:
             response = responses[name]
-            text = response["text"]
-            gif = response["gif"]
+            text = response.get("text", "")
+            gif = response.get("gif", "")
 
-            embed = None
+            # Send text if exists
+            if text:
+                await message.channel.send(text)
+
+            # Send gif file if exists
             if gif:
-                embed = discord.Embed()
-                embed.set_image(url=gif)
-
-            if text and embed:
-                await message.channel.send(content=text, embed=embed)
-            elif embed:
-                await message.channel.send(embed=embed)
-            else:
-                await message.channel.send(content=text)
+                gif_path = os.path.join("gifs", gif)
+                if os.path.exists(gif_path):
+                    await message.channel.send(file=discord.File(gif_path))
+                else:
+                    await message.channel.send(f"❌ GIF `{gif}` not found in /gifs")
 
     # ✅ Always call this at the very end
     await bot.process_commands(message)
