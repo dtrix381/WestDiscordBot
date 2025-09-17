@@ -39,7 +39,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 FONT_PATH = Path(__file__).parent / "fonts" / "Roboto-Bold.ttf"
-TARGET_TIMESTAMP = 1758348000  # replace with your UNIX timestamp
+TARGET_TIME = 1758348000  # replace with your UNIX timestamp
 # Replace with your actual Discord Application Client ID
 CLIENT_ID = "1400670306397589685"
 
