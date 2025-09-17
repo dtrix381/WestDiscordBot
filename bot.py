@@ -19,6 +19,7 @@ from discord.ui import View, Button
 import shutil
 import asyncio, time
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from pathlib import Path
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -35,6 +36,7 @@ intents.messages = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+FONT_PATH = Path(__file__).parent / "fonts" / "Roboto-Bold.ttf"
 TARGET_TIME = 1758348000  # replace with your UNIX timestamp
 # Replace with your actual Discord Application Client ID
 CLIENT_ID = "1400670306397589685"
@@ -1222,13 +1224,14 @@ def make_countdown_image(seconds_left: int, filename="countdown.png"):
         b = int(60 + (120 * y / height))
         draw.line([(0, y), (width, y)], fill=(r, g, b))
 
-    # Fonts
+    # Fonts (use bundled font)
     try:
-        base_font = "arial.ttf"
-    except:
-        base_font = None  # fallback
-
-    small_font = ImageFont.truetype(base_font, 28) if base_font else ImageFont.load_default()
+        big_font = ImageFont.truetype(str(FONT_PATH), 72)
+        small_font = ImageFont.truetype(str(FONT_PATH), 28)
+    except OSError:
+        # Fallback (tiny but guaranteed)
+        big_font = ImageFont.load_default()
+        small_font = ImageFont.load_default()
 
     box_width = width // 3
 
@@ -1248,28 +1251,16 @@ def make_countdown_image(seconds_left: int, filename="countdown.png"):
             width=3,
         )
 
-        # --- Dynamically scale number font ---
-        max_font_size = 120
-        font_size = max_font_size
-        while True:
-            font = ImageFont.truetype(base_font, font_size) if base_font else ImageFont.load_default()
-            bbox = draw.textbbox((0, 0), part, font=font)
-            w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-            if w < (box_width - 40) and h < (panel_y1 - panel_y0 - 20):
-                break
-            font_size -= 2
-        # Center number
+        # Numbers
+        bbox = draw.textbbox((0, 0), part, font=big_font)
+        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
         draw.text(
             (x_center - w // 2 + 3, (panel_y0 + panel_y1)//2 - h//2 + 3),
-            part,
-            font=font,
-            fill=(0, 0, 0),
+            part, font=big_font, fill=(0, 0, 0)
         )  # shadow
         draw.text(
             (x_center - w // 2, (panel_y0 + panel_y1)//2 - h//2),
-            part,
-            font=font,
-            fill=(255, 255, 255),
+            part, font=big_font, fill=(255, 255, 255)
         )
 
         # Labels
@@ -1277,9 +1268,7 @@ def make_countdown_image(seconds_left: int, filename="countdown.png"):
         lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
         draw.text(
             (x_center - lw // 2, 40 - lh // 2),
-            label,
-            font=small_font,
-            fill=(180, 220, 255),
+            label, font=small_font, fill=(180, 220, 255)
         )
 
     img.save(filename)
