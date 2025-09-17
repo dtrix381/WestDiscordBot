@@ -1206,74 +1206,111 @@ async def db_upload(interaction: discord.Interaction, attachment: discord.Attach
     await attachment.save(DB_PATH)
     await interaction.response.send_message("✅ Database replaced successfully.", ephemeral=True)
 
-def make_countdown_image(remaining):
-    # Convert remaining seconds into h:m:s
-    hours, remainder = divmod(int(remaining), 3600)
-    minutes, seconds = divmod(remainder, 60)
-    text = f"{hours:02}:{minutes:02}:{seconds:02}"
+# Function to generate countdown image
+def make_countdown_image(seconds_left: int, filename="countdown.png"):
+    # Format time parts
+    hrs, rem = divmod(seconds_left, 3600)
+    mins, secs = divmod(rem, 60)
+    parts = [f"{hrs:02}", f"{mins:02}", f"{secs:02}"]
+    labels = ["HRS", "MINS", "SECS"]
 
-    # Canvas size
-    width, height = 500, 200
-    img = Image.new("RGB", (width, height), (10, 10, 30))  # dark bg
+    # --- Base image ---
+    width, height = 500, 220
+    img = Image.new("RGB", (width, height), color=(15, 15, 25))
     draw = ImageDraw.Draw(img)
 
-    # Title
-    title_font = ImageFont.load_default()
-    title_text = "HRS : MINS : SECS"
-    tw, th = draw.textbbox((0, 0), title_text, font=title_font)[2:]
-    draw.text(((width - tw) / 2, 20), title_text, font=title_font, fill=(0, 200, 255))
+    # --- Gradient background ---
+    for y in range(height):
+        r = int(30 + (80 * y / height))
+        g = int(10 + (40 * y / height))
+        b = int(60 + (120 * y / height))
+        draw.line([(0, y), (width, y)], fill=(r, g, b))
 
-    # Main Numbers (big + bold with default font trick)
-    base_font = ImageFont.load_default()
-    scale = 12  # size thickness
+    # Fonts (Render has no arial.ttf, so fall back to default but larger)
+    try:
+        big_font = ImageFont.truetype("DejaVuSans.ttf", 72)  # bundled with Pillow
+        small_font = ImageFont.truetype("DejaVuSans.ttf", 26)
+    except:
+        big_font = ImageFont.load_default()
+        small_font = ImageFont.load_default()
 
-    # Shadow
-    for offset in range(8):
-        draw.text(
-            (width / 2 - 120 + offset % 3, height / 2 - 40 + offset // 3),
-            text,
-            font=base_font,
-            fill=(0, 0, 0),
+    box_width = width // 3
+
+    for i, (part, label) in enumerate(zip(parts, labels)):
+        x_center = i * box_width + box_width // 2
+
+        # --- Panel background ---
+        panel_x0 = i * box_width + 20
+        panel_x1 = (i + 1) * box_width - 20
+        panel_y0 = 50
+        panel_y1 = 180
+        draw.rounded_rectangle(
+            [panel_x0, panel_y0, panel_x1, panel_y1],
+            radius=15,
+            fill=(40, 40, 60),
+            outline=(100, 200, 255),
+            width=3,
         )
 
-    # Bold/Thickened text
-    for x_offset in range(-scale, scale, 2):
-        for y_offset in range(-scale, scale, 2):
-            draw.text(
-                (width / 2 - 120 + x_offset, height / 2 - 40 + y_offset),
-                text,
-                font=base_font,
-                fill=(255, 255, 255),
-            )
+        # --- Big Numbers ---
+        bbox = draw.textbbox((0, 0), part, font=big_font)
+        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        draw.text(
+            (x_center - w // 2 + 2, 115 - h // 2 + 2),
+            part,
+            font=big_font,
+            fill=(0, 0, 0),
+        )  # shadow
+        draw.text(
+            (x_center - w // 2, 115 - h // 2),
+            part,
+            font=big_font,
+            fill=(255, 255, 255),
+        )
 
-    # Save to memory
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-    return buf
+        # --- Labels ---
+        bbox = draw.textbbox((0, 0), label, font=small_font)
+        lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        draw.text(
+            (x_center - lw // 2, 60 - lh // 2),
+            label,
+            font=small_font,
+            fill=(180, 220, 255),
+        )
 
-# ---------------- Slash Command ---------------- #
-@bot.tree.command(name="countdown")
+    img.save(filename)
+    return filename
+
+
+# Slash command for countdown
+@bot.tree.command(name="countdown", description="Start a countdown timer")
 async def countdown(interaction: discord.Interaction):
-    """Start a countdown to the target time"""
     await interaction.response.defer()
-
-    message = await interaction.followup.send("⏳ Generating countdown...")
+    msg = await interaction.followup.send("⏳ Preparing countdown...")
 
     while True:
-        now = datetime.now(timezone.utc).timestamp()
-        remaining = TARGET_TIMESTAMP - now
+        remaining = TARGET_TIME - int(time.time())
 
         if remaining <= 0:
-            await message.edit(content="✅ The countdown has ended!", attachments=[])
+            await msg.edit(content="🎉 Forfeit Stream is on!", attachments=[])
             break
 
+        # Make countdown image
         file = discord.File(make_countdown_image(remaining), filename="countdown.png")
-        await message.edit(content="⏳ Countdown:", attachments=[file])
+        embed = discord.Embed(
+            title="Countdown Timer until Forfeit Stream",
+            color=discord.Color.green(),
+        )
+        embed.set_image(url="attachment://countdown.png")
 
-        # If more than 1 minute left → update every 60s
-        # If less than 1 minute left → update every second
-        await asyncio.sleep(1 if remaining <= 60 else 60)
+        # Edit message
+        await msg.edit(content="", embed=embed, attachments=[file])
+
+        # Update rate
+        if remaining > 60:
+            await asyncio.sleep(60)
+        else:
+            await asyncio.sleep(1)
 
 
 print("Loaded token:", TOKEN)
