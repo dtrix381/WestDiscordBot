@@ -21,6 +21,7 @@ import asyncio, time
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from pathlib import Path
 import io
+from datetime import datetime, timezone
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
