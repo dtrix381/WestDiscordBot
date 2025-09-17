@@ -1277,32 +1277,5 @@ def make_countdown_image(seconds_left: int, filename="countdown.png"):
     img.save(filename)
     return filename
 
-# Slash command for countdown
-@bot.tree.command(name="countdown", description="Start a countdown timer")
-async def countdown(interaction: discord.Interaction):
-    await interaction.response.defer()
-    msg = await interaction.followup.send("⏳ Preparing countdown...")
-
-    while True:
-        remaining = TARGET_TIME - int(time.time())
-
-        if remaining <= 0:
-            await msg.edit(content="🎉 Time’s up!", attachments=[])
-            break
-
-        # Make countdown image
-        file = discord.File(make_countdown_image(remaining), filename="countdown.png")
-        embed = discord.Embed(title="Countdown Timer", color=discord.Color.green())
-        embed.set_image(url="attachment://countdown.png")
-
-        # Edit message
-        await msg.edit(content="", embed=embed, attachments=[file])
-
-        # Update rate
-        if remaining > 60:
-            await asyncio.sleep(60)
-        else:
-            await asyncio.sleep(1)
-
 print("Loaded token:", TOKEN)
 bot.run(TOKEN)
