@@ -20,6 +20,7 @@ import shutil
 import asyncio, time
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from pathlib import Path
+import io
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -1204,119 +1205,74 @@ async def db_upload(interaction: discord.Interaction, attachment: discord.Attach
     await attachment.save(DB_PATH)
     await interaction.response.send_message("✅ Database replaced successfully.", ephemeral=True)
 
-def get_scaled_font(draw, text, font_path, max_width, max_height, start_size=120):
-    """Scale font to fit inside a box."""
-    font_size = start_size
-    while font_size > 10:
-        font = ImageFont.truetype(str(font_path), font_size)
-        bbox = draw.textbbox((0, 0), text, font=font)
-        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-        if w <= max_width and h <= max_height:
-            return font
-        font_size -= 2
-    return ImageFont.truetype(str(font_path), 20)  # absolute fallback
+def make_countdown_image(remaining):
+    # Convert remaining seconds into h:m:s
+    hours, remainder = divmod(int(remaining), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    text = f"{hours:02}:{minutes:02}:{seconds:02}"
 
-def make_countdown_image(seconds_left: int, filename="countdown.png"):
-    # Format time parts
-    hrs, rem = divmod(seconds_left, 3600)
-    mins, secs = divmod(rem, 60)
-    parts = [f"{hrs:02}", f"{mins:02}", f"{secs:02}"]
-    labels = ["HRS", "MINS", "SECS"]
-
-    # --- Base image ---
-    width, height = 600, 250
-    img = Image.new("RGB", (width, height), color=(15, 15, 25))
+    # Canvas size
+    width, height = 500, 200
+    img = Image.new("RGB", (width, height), (10, 10, 30))  # dark bg
     draw = ImageDraw.Draw(img)
 
-    # Gradient background
-    for y in range(height):
-        r = int(30 + (80 * y / height))
-        g = int(10 + (40 * y / height))
-        b = int(60 + (120 * y / height))
-        draw.line([(0, y), (width, y)], fill=(r, g, b))
+    # Title
+    title_font = ImageFont.load_default()
+    title_text = "HRS : MINS : SECS"
+    tw, th = draw.textbbox((0, 0), title_text, font=title_font)[2:]
+    draw.text(((width - tw) / 2, 20), title_text, font=title_font, fill=(0, 200, 255))
 
-    # Label font
-    try:
-        small_font = ImageFont.truetype(str(FONT_PATH), 28)
-    except OSError:
-        small_font = ImageFont.load_default()
+    # Main Numbers (big + bold with default font trick)
+    base_font = ImageFont.load_default()
+    scale = 12  # size thickness
 
-    box_width = width // 3
-    box_height = 120  # height of number panel
-
-    for i, (part, label) in enumerate(zip(parts, labels)):
-        x_center = i * box_width + box_width // 2
-
-        # Panel background
-        panel_x0 = i * box_width + 20
-        panel_x1 = (i + 1) * box_width - 20
-        panel_y0 = 70
-        panel_y1 = 190
-        draw.rounded_rectangle(
-            [panel_x0, panel_y0, panel_x1, panel_y1],
-            radius=20,
-            fill=(40, 40, 60),
-            outline=(100, 200, 255),
-            width=3,
-        )
-
-        # Dynamically scale number font
-        number_font = get_scaled_font(
-            draw, part, FONT_PATH,
-            max_width=(panel_x1 - panel_x0 - 20),
-            max_height=(panel_y1 - panel_y0 - 20),
-            start_size=160,
-        )
-
-        # Draw number (with shadow)
-        bbox = draw.textbbox((0, 0), part, font=number_font)
-        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    # Shadow
+    for offset in range(8):
         draw.text(
-            (x_center - w // 2 + 3, (panel_y0 + panel_y1)//2 - h//2 + 3),
-            part, font=number_font, fill=(0, 0, 0)
-        )
-        draw.text(
-            (x_center - w // 2, (panel_y0 + panel_y1)//2 - h//2),
-            part, font=number_font, fill=(255, 255, 255)
+            (width / 2 - 120 + offset % 3, height / 2 - 40 + offset // 3),
+            text,
+            font=base_font,
+            fill=(0, 0, 0),
         )
 
-        # Labels
-        bbox = draw.textbbox((0, 0), label, font=small_font)
-        lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
-        draw.text(
-            (x_center - lw // 2, 40 - lh // 2),
-            label, font=small_font, fill=(180, 220, 255)
-        )
+    # Bold/Thickened text
+    for x_offset in range(-scale, scale, 2):
+        for y_offset in range(-scale, scale, 2):
+            draw.text(
+                (width / 2 - 120 + x_offset, height / 2 - 40 + y_offset),
+                text,
+                font=base_font,
+                fill=(255, 255, 255),
+            )
 
-    img.save(filename)
-    return filename
+    # Save to memory
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
 
-# Slash command for countdown
-@bot.tree.command(name="countdown", description="Start a countdown timer")
+# ---------------- Slash Command ---------------- #
+@bot.tree.command(name="countdown")
 async def countdown(interaction: discord.Interaction):
+    """Start a countdown to the target time"""
     await interaction.response.defer()
-    msg = await interaction.followup.send("⏳ Preparing countdown...")
+
+    message = await interaction.followup.send("⏳ Generating countdown...")
 
     while True:
-        remaining = TARGET_TIME - int(time.time())
+        now = datetime.now(timezone.utc).timestamp()
+        remaining = TARGET_TIMESTAMP - now
 
         if remaining <= 0:
-            await msg.edit(content="🎉 Forfeit Stream is on!", attachments=[])
+            await message.edit(content="✅ The countdown has ended!", attachments=[])
             break
 
-        # Make countdown image
         file = discord.File(make_countdown_image(remaining), filename="countdown.png")
-        embed = discord.Embed(title="Countdown Timer until Forfeit Stream", color=discord.Color.green())
-        embed.set_image(url="attachment://countdown.png")
+        await message.edit(content="⏳ Countdown:", attachments=[file])
 
-        # Edit message
-        await msg.edit(content="", embed=embed, attachments=[file])
-
-        # Update rate
-        if remaining > 60:
-            await asyncio.sleep(60)
-        else:
-            await asyncio.sleep(1)
+        # If more than 1 minute left → update every 60s
+        # If less than 1 minute left → update every second
+        await asyncio.sleep(1 if remaining <= 60 else 60)
 
 
 print("Loaded token:", TOKEN)
