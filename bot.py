@@ -1211,11 +1211,11 @@ def make_countdown_image(seconds_left: int, filename="countdown.png"):
     labels = ["HRS", "MINS", "SECS"]
 
     # --- Base image ---
-    width, height = 500, 220
+    width, height = 600, 250
     img = Image.new("RGB", (width, height), color=(15, 15, 25))
     draw = ImageDraw.Draw(img)
 
-    # --- Gradient background ---
+    # Gradient background
     for y in range(height):
         r = int(30 + (80 * y / height))
         g = int(10 + (40 * y / height))
@@ -1224,51 +1224,59 @@ def make_countdown_image(seconds_left: int, filename="countdown.png"):
 
     # Fonts
     try:
-        big_font = ImageFont.truetype("arial.ttf", 72)
-        small_font = ImageFont.truetype("arial.ttf", 26)
+        base_font = "arial.ttf"
     except:
-        big_font = ImageFont.load_default()
-        small_font = ImageFont.load_default()
+        base_font = None  # fallback
+
+    small_font = ImageFont.truetype(base_font, 28) if base_font else ImageFont.load_default()
 
     box_width = width // 3
 
     for i, (part, label) in enumerate(zip(parts, labels)):
         x_center = i * box_width + box_width // 2
 
-        # --- Panel background ---
+        # Panel background
         panel_x0 = i * box_width + 20
         panel_x1 = (i + 1) * box_width - 20
-        panel_y0 = 50
-        panel_y1 = 180
+        panel_y0 = 70
+        panel_y1 = 190
         draw.rounded_rectangle(
             [panel_x0, panel_y0, panel_x1, panel_y1],
-            radius=15,
+            radius=20,
             fill=(40, 40, 60),
             outline=(100, 200, 255),
             width=3,
         )
 
-        # --- Big Numbers ---
-        bbox = draw.textbbox((0, 0), part, font=big_font)
-        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        # --- Dynamically scale number font ---
+        max_font_size = 120
+        font_size = max_font_size
+        while True:
+            font = ImageFont.truetype(base_font, font_size) if base_font else ImageFont.load_default()
+            bbox = draw.textbbox((0, 0), part, font=font)
+            w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+            if w < (box_width - 40) and h < (panel_y1 - panel_y0 - 20):
+                break
+            font_size -= 2
+        # Center number
         draw.text(
-            (x_center - w // 2 + 2, 115 - h // 2 + 2),
+            (x_center - w // 2 + 3, (panel_y0 + panel_y1)//2 - h//2 + 3),
             part,
-            font=big_font,
+            font=font,
             fill=(0, 0, 0),
         )  # shadow
         draw.text(
-            (x_center - w // 2, 115 - h // 2),
+            (x_center - w // 2, (panel_y0 + panel_y1)//2 - h//2),
             part,
-            font=big_font,
+            font=font,
             fill=(255, 255, 255),
         )
 
-        # --- Labels ---
+        # Labels
         bbox = draw.textbbox((0, 0), label, font=small_font)
         lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
         draw.text(
-            (x_center - lw // 2, 60 - lh // 2),
+            (x_center - lw // 2, 40 - lh // 2),
             label,
             font=small_font,
             fill=(180, 220, 255),
@@ -1276,7 +1284,6 @@ def make_countdown_image(seconds_left: int, filename="countdown.png"):
 
     img.save(filename)
     return filename
-
 
 # Slash command for countdown
 @bot.tree.command(name="countdown", description="Start a countdown timer")
