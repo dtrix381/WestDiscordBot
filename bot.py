@@ -1204,7 +1204,18 @@ async def db_upload(interaction: discord.Interaction, attachment: discord.Attach
     await attachment.save(DB_PATH)
     await interaction.response.send_message("✅ Database replaced successfully.", ephemeral=True)
 
-# Function to generate countdown image
+def get_scaled_font(draw, text, font_path, max_width, max_height, start_size=120):
+    """Scale font to fit inside a box."""
+    font_size = start_size
+    while font_size > 10:
+        font = ImageFont.truetype(str(font_path), font_size)
+        bbox = draw.textbbox((0, 0), text, font=font)
+        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        if w <= max_width and h <= max_height:
+            return font
+        font_size -= 2
+    return ImageFont.truetype(str(font_path), 20)  # absolute fallback
+
 def make_countdown_image(seconds_left: int, filename="countdown.png"):
     # Format time parts
     hrs, rem = divmod(seconds_left, 3600)
@@ -1224,16 +1235,14 @@ def make_countdown_image(seconds_left: int, filename="countdown.png"):
         b = int(60 + (120 * y / height))
         draw.line([(0, y), (width, y)], fill=(r, g, b))
 
-    # Fonts (use bundled font)
+    # Label font
     try:
-        big_font = ImageFont.truetype(str(FONT_PATH), 72)
         small_font = ImageFont.truetype(str(FONT_PATH), 28)
     except OSError:
-        # Fallback (tiny but guaranteed)
-        big_font = ImageFont.load_default()
         small_font = ImageFont.load_default()
 
     box_width = width // 3
+    box_height = 120  # height of number panel
 
     for i, (part, label) in enumerate(zip(parts, labels)):
         x_center = i * box_width + box_width // 2
@@ -1251,16 +1260,24 @@ def make_countdown_image(seconds_left: int, filename="countdown.png"):
             width=3,
         )
 
-        # Numbers
-        bbox = draw.textbbox((0, 0), part, font=big_font)
+        # Dynamically scale number font
+        number_font = get_scaled_font(
+            draw, part, FONT_PATH,
+            max_width=(panel_x1 - panel_x0 - 20),
+            max_height=(panel_y1 - panel_y0 - 20),
+            start_size=160,
+        )
+
+        # Draw number (with shadow)
+        bbox = draw.textbbox((0, 0), part, font=number_font)
         w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
         draw.text(
             (x_center - w // 2 + 3, (panel_y0 + panel_y1)//2 - h//2 + 3),
-            part, font=big_font, fill=(0, 0, 0)
-        )  # shadow
+            part, font=number_font, fill=(0, 0, 0)
+        )
         draw.text(
             (x_center - w // 2, (panel_y0 + panel_y1)//2 - h//2),
-            part, font=big_font, fill=(255, 255, 255)
+            part, font=number_font, fill=(255, 255, 255)
         )
 
         # Labels
